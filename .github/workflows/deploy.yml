@@ -1,0 +1,51 @@
+name: Deploy Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (tag or commit SHA)'
+        required: true
+        default: 'main'
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+        default: 'dev'
+
+jobs:
+  dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    if: github.event.inputs.environment == 'dev' || github.event.inputs.environment == ''
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+      
+      - name: Echo deployment info
+        run: |
+          echo "🚀 Starting deployment to development environment"
+          echo "📦 Version: ${{ github.event.inputs.version }}"
+          echo "🌍 Environment: ${{ github.event.inputs.environment }}"
+          echo "📅 Timestamp: $(date)"
+          echo "👤 Triggered by: ${{ github.actor }}"
+          echo "✅ Development deployment completed successfully!"
+      
+      - name: Simulate deployment work
+        run: |
+          echo "Installing dependencies..."
+          sleep 2
+          echo "Building application..."
+          sleep 3
+          echo "Running tests..."
+          sleep 2
+          echo "Deploying to dev environment..."
+          sleep 5
+          echo "🎉 Deployment to development environment complete!"
