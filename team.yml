@@ -1,0 +1,17 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: infrastructure
+  description: The infra business unit
+spec:
+  members: [codingdiaz]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: codingdiaz
+spec:
+  profile:
+    displayName: Christopher Diaz
+    email: codingdiaz@foobar.com
+  memberOf: [infrastructure]
