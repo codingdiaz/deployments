@@ -1,7 +1,7 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: deployments
+  name: deployments-reused-workflow
   annotations:
     backstage.io/deployment-enabled: "true"
     backstage.io/source-location: "url:https://github.com/codingdiaz/deployments"
