@@ -4,6 +4,7 @@ metadata:
   name: infrastructure
   description: The infra business unit
 spec:
+  type: team
   members: [codingdiaz]
 ---
 apiVersion: backstage.io/v1alpha1
