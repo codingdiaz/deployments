@@ -1,0 +1,29 @@
+name: Deploy to Development
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (tag, commit SHA, or branch name)'
+        required: true
+        default: 'main'
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    environment: dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+      
+      - name: Deploy to development
+        run: |
+          echo "🚀 Deploying ${{ github.event.inputs.version }} to development"
+          echo "🔒 Using GitHub Environment: dev"
+          sleep 3
+          echo "✅ Development deployment complete!"

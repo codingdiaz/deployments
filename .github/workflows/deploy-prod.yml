@@ -1,0 +1,29 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (tag, commit SHA, or branch name)'
+        required: true
+        default: 'main'
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+      
+      - name: Deploy to production
+        run: |
+          echo "🚀 Deploying ${{ github.event.inputs.version }} to production"
+          echo "🔒 Using GitHub Environment: production"
+          sleep 3
+          echo "✅ Production deployment complete!"

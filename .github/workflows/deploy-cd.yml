@@ -1,0 +1,53 @@
+name: Continuous Deployment Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to deploy (tag, commit SHA, or branch name)'
+        required: true
+        default: 'main'
+        type: string
+
+jobs:
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      deployment-url: ${{ steps.deploy.outputs.url }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+      
+      - name: Deploy to development
+        id: deploy
+        run: |
+          echo "🚀 Deploying ${{ github.event.inputs.version }} to development"
+          echo "🔒 Using GitHub Environment: dev"
+          sleep 3
+          echo "✅ Development deployment complete!"
+          echo "url=https://dev.example.com" >> $GITHUB_OUTPUT
+
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    needs: deploy-dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version }}
+      
+      - name: Deploy to production
+        run: |
+          echo "🚀 Promoting ${{ github.event.inputs.version }} to production"
+          echo "🔗 Dev deployment: ${{ needs.deploy-dev.outputs.deployment-url }}"
+          echo "🔒 Using GitHub Environment: production"
+          sleep 3
+          echo "✅ Production deployment complete!"

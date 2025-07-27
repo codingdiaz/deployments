@@ -4,24 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to deploy (tag or commit SHA)'
+        description: 'Version to deploy (tag, commit SHA, or branch name)'
         required: true
         default: 'main'
+        type: string
       environment:
-        description: 'Target environment'
+        description: 'Target environment name'
         required: true
-        type: choice
-        options:
-          - dev
-          - staging
-          - production
         default: 'dev'
+        type: string
 
 jobs:
-  dev:
-    name: Deploy to Development
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment }}
     runs-on: ubuntu-latest
-    if: github.event.inputs.environment == 'dev' || github.event.inputs.environment == ''
+    environment: ${{ github.event.inputs.environment }}
     
     steps:
       - name: Checkout code
@@ -29,23 +26,9 @@ jobs:
         with:
           ref: ${{ github.event.inputs.version }}
       
-      - name: Echo deployment info
+      - name: Deploy to environment
         run: |
-          echo "🚀 Starting deployment to development environment"
-          echo "📦 Version: ${{ github.event.inputs.version }}"
-          echo "🌍 Environment: ${{ github.event.inputs.environment }}"
-          echo "📅 Timestamp: $(date)"
-          echo "👤 Triggered by: ${{ github.actor }}"
-          echo "✅ Development deployment completed successfully!"
-      
-      - name: Simulate deployment work
-        run: |
-          echo "Installing dependencies..."
-          sleep 2
-          echo "Building application..."
+          echo "🚀 Deploying ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}"
+          echo "🔒 Using GitHub Environment: ${{ github.event.inputs.environment }}"
           sleep 3
-          echo "Running tests..."
-          sleep 2
-          echo "Deploying to dev environment..."
-          sleep 5
-          echo "🎉 Deployment to development environment complete!"
+          echo "✅ Deployment complete!"
