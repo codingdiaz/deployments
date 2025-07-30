@@ -96,7 +96,7 @@ export class GitHubApiService {
   private tokenPromise: Promise<string> | null = null;
   private statusCache = new Map<string, { data: DeploymentStatus; timestamp: number }>();
   private historyCache = new Map<string, { data: DeploymentHistoryEntry[]; timestamp: number }>();
-  private readonly CACHE_TTL = 30 * 1000; // 30 seconds
+  private readonly CACHE_TTL = 15 * 1000; // 15 seconds
 
   constructor(private oauthApi: OAuthApi) {}
 
@@ -382,6 +382,7 @@ export class GitHubApiService {
     workflowPath: string,
     environmentName: string,
     version: string,
+    componentName?: string,
   ): Promise<{ workflowUrl: string; workflowRunUrl: string | null; workflowId: number }> {
     if (!workflowPath) {
       throw new GitHubApiError(
@@ -452,11 +453,13 @@ export class GitHubApiService {
           workflowRunUrl = newRun.html_url;
         }
       } catch (error) {
-        console.warn('Could not fetch latest workflow run:', error);
+        // Silently handle workflow run fetch errors
       }
 
       // Clear cache for this environment since we just triggered a deployment
-      this.clearCacheForEnvironment('', environmentName);
+      if (componentName) {
+        this.clearCacheForEnvironment(componentName, environmentName);
+      }
 
       return {
         workflowUrl,
@@ -482,6 +485,23 @@ export class GitHubApiService {
           sha: tag.commit.sha,
           url: tag.commit.url,
         },
+      }));
+    });
+  }
+
+  async listBranches(owner: string, repo: string, perPage: number = 50): Promise<Array<{ name: string; sha: string }>> {
+    const octokit = await this.getOctokit();
+
+    return this.handleApiCall(async () => {
+      const response = await octokit.rest.repos.listBranches({
+        owner,
+        repo,
+        per_page: perPage,
+      });
+
+      return response.data.map(branch => ({
+        name: branch.name,
+        sha: branch.commit.sha,
       }));
     });
   }
@@ -831,7 +851,6 @@ export class GitHubApiService {
       } catch (error) {
         // If we can't get run details, include the run to avoid breaking the UI
         // This maintains backward compatibility and prevents filtering from breaking the system
-        console.warn(`Could not fetch details for run ${run.id}:`, error);
         filteredRuns.push(run);
       }
     }
@@ -1157,5 +1176,70 @@ export class GitHubApiService {
     const cacheKey = this.getCacheKey(componentName, environmentName);
     this.statusCache.delete(cacheKey);
     this.historyCache.delete(cacheKey);
+  }
+
+  async listRepositoryEnvironments(owner: string, repo: string): Promise<string[]> {
+    const octokit = await this.getOctokit();
+    
+    return this.handleApiCall(async () => {
+      try {
+        const response = await octokit.rest.repos.getAllEnvironments({
+          owner,
+          repo,
+        });
+        
+        return response.data.environments?.map(env => env.name) || [];
+      } catch (error: any) {
+        // If environments API fails (not available/no permissions), fall back to deployment environments
+        if (error.status === 404 || error.status === 403) {
+          try {
+            const deployments = await this.listDeployments(owner, repo, undefined, 100);
+            const environments = new Set<string>();
+            deployments.forEach(deployment => {
+              if (deployment.environment) {
+                environments.add(deployment.environment);
+              }
+            });
+            return Array.from(environments).sort();
+          } catch (deploymentError) {
+            // If both APIs fail, return empty array so user knows we couldn't fetch environments
+            return [];
+          }
+        }
+        throw error;
+      }
+    });
+  }
+
+  async listWorkflowFiles(owner: string, repo: string): Promise<string[]> {
+    const octokit = await this.getOctokit();
+    
+    return this.handleApiCall(async () => {
+      try {
+        const response = await octokit.rest.repos.getContent({
+          owner,
+          repo,
+          path: '.github/workflows',
+        });
+
+        if (Array.isArray(response.data)) {
+          return response.data
+            .filter(file => 
+              file.type === 'file' && 
+              file.name &&
+              /\.(yml|yaml)$/i.test(file.name)
+            )
+            .map(file => `.github/workflows/${file.name}`)
+            .sort();
+        }
+        
+        return [];
+      } catch (error: any) {
+        if (error.status === 404) {
+          return []; // No workflows directory found
+        }
+        throw error;
+      }
+    });
   }
 }

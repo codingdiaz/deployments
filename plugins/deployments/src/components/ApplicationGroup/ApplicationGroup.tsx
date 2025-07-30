@@ -26,6 +26,7 @@ import { ApplicationGroup, OwnerInfo, ViewMode } from '@internal/plugin-deployme
 import { AccessIndicator } from '../AccessIndicator';
 import { GitHubRepoLink } from '../GitHubRepoLink';
 import { applicationDeploymentRouteRef } from '../../routes';
+import { useEnvironments } from '../../hooks/useDeploymentApi';
 import { ANNOTATIONS } from '@internal/plugin-deployments-common';
 
 
@@ -142,6 +143,16 @@ const useStyles = makeStyles((theme: Theme) => ({
     height: '20px',
     fontSize: '0.75rem',
   },
+  environmentChip: {
+    height: '18px',
+    fontSize: '0.6875rem',
+    backgroundColor: theme.palette.success.light,
+    color: theme.palette.success.contrastText,
+    '& .MuiChip-label': {
+      paddingLeft: theme.spacing(0.75),
+      paddingRight: theme.spacing(0.75),
+    },
+  },
   unassignedGroup: {
     '& $groupHeader': {
       backgroundColor: theme.palette.warning.light,
@@ -171,6 +182,17 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({
   const componentName = entity.metadata.name;
   const description = entity.metadata.description || 'No description available';
   const sourceLocation = entity.metadata.annotations?.[ANNOTATIONS.SOURCE_LOCATION];
+
+  // Fetch environments for this application
+  const { environments, loading: environmentsLoading, error: environmentsError, loadEnvironments } = useEnvironments(componentName);
+
+  // Load environments when component mounts or componentName changes
+  React.useEffect(() => {
+    if (componentName) {
+      loadEnvironments();
+    }
+  }, [componentName, loadEnvironments]);
+
 
   // Extract GitHub repo info from source location
   const getGitHubInfo = (url?: string) => {
@@ -223,16 +245,33 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({
               variant="outlined"
             />
           )}
-          
-          {entity.spec?.lifecycle && (
-            <Chip 
-              label={String(entity.spec.lifecycle)} 
-              size="small" 
+          {environmentsLoading && (
+            <Chip
+              label="Loading..."
+              size="small"
               className={classes.metaChip}
-              color="secondary"
               variant="outlined"
+              disabled
             />
           )}
+          {environmentsError && (
+            <Chip
+              label="Error loading envs"
+              size="small"
+              className={classes.metaChip}
+              variant="outlined"
+              color="secondary"
+            />
+          )}
+          {!environmentsLoading && !environmentsError && environments.map((env) => (
+            <Chip
+              key={env.environmentName}
+              label={env.environmentName}
+              size="small"
+              className={classes.environmentChip}
+              variant="filled"
+            />
+          ))}
         </Box>
 
         {githubInfo && (
@@ -303,19 +342,9 @@ export const ApplicationGroupComponent: React.FC<ApplicationGroupProps> = ({
         title={
           <Box className={classes.groupHeaderContent}>
             <Box className={classes.ownerInfo}>
-              <Avatar className={classes.ownerAvatar}>
-                {group.owner.avatar ? (
-                  <img src={group.owner.avatar} alt={group.owner.displayName} />
-                ) : (
-                  getOwnerInitials(group.owner)
-                )}
-              </Avatar>
               <Box className={classes.ownerDetails}>
                 <Typography className={classes.ownerName}>
                   {group.owner.displayName}
-                </Typography>
-                <Typography className={classes.ownerType}>
-                  {getOwnerIcon(group.owner)} {group.owner.type}
                 </Typography>
               </Box>
             </Box>

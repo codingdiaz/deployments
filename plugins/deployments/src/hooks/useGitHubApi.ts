@@ -74,10 +74,91 @@ export function useGitHubWorkflowRuns(
 }
 
 export function useGitHubTags(owner: string, repo: string, perPage: number = 50) {
-  return useGitHubApiCall(
-    (service) => service.listTags(owner, repo, perPage),
-    [owner, repo, perPage],
-  );
+  const service = useGitHubApi();
+  const [data, setData] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<GitHubApiError | null>(null);
+
+  const hasValidParams = Boolean(owner && repo);
+
+  const executeCall = useCallback(async () => {
+    if (!hasValidParams) {
+      setData(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await service.listTags(owner, repo, perPage);
+      setData(result);
+    } catch (err) {
+      if (err instanceof GitHubApiError) {
+        setError(err);
+      } else {
+        setError(new GitHubApiError('An unexpected error occurred'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [service, owner, repo, perPage, hasValidParams]);
+
+  useEffect(() => {
+    executeCall();
+  }, [executeCall]);
+
+  const retry = useCallback(() => {
+    executeCall();
+  }, [executeCall]);
+
+  return { data, loading, error, retry };
+}
+
+export function useGitHubBranches(owner: string, repo: string, perPage: number = 50) {
+  const service = useGitHubApi();
+  const [data, setData] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<GitHubApiError | null>(null);
+
+  const hasValidParams = Boolean(owner && repo);
+
+  const executeCall = useCallback(async () => {
+    if (!hasValidParams) {
+      setData(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await service.listBranches(owner, repo, perPage);
+      setData(result);
+    } catch (err) {
+      if (err instanceof GitHubApiError) {
+        setError(err);
+      } else {
+        setError(new GitHubApiError('An unexpected error occurred'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [service, owner, repo, perPage, hasValidParams]);
+
+  useEffect(() => {
+    executeCall();
+  }, [executeCall]);
+
+  const retry = useCallback(() => {
+    executeCall();
+  }, [executeCall]);
+
+  return { data, loading, error, retry };
 }
 
 export function useGitHubCommits(
@@ -221,12 +302,13 @@ export function useTriggerDeployment() {
     workflowPath: string,
     environmentName: string,
     version: string,
+    componentName?: string,
   ): Promise<{ workflowUrl: string; workflowRunUrl: string | null; workflowId: number } | null> => {
     setLoading(true);
     setError(null);
     
     try {
-      const result = await service.triggerDeployment(owner, repo, workflowPath, environmentName, version);
+      const result = await service.triggerDeployment(owner, repo, workflowPath, environmentName, version, componentName);
       return result;
     } catch (err) {
       if (err instanceof GitHubApiError) {
@@ -241,4 +323,92 @@ export function useTriggerDeployment() {
   }, [service]);
 
   return { triggerDeployment, loading, error };
+}
+
+export function useGitHubEnvironments(owner: string, repo: string) {
+  const service = useGitHubApi();
+  const [data, setData] = useState<string[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<GitHubApiError | null>(null);
+
+  const hasValidParams = Boolean(owner && repo);
+
+  const executeCall = useCallback(async () => {
+    if (!hasValidParams) {
+      setData(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await service.listRepositoryEnvironments(owner, repo);
+      setData(result);
+    } catch (err) {
+      if (err instanceof GitHubApiError) {
+        setError(err);
+      } else {
+        setError(new GitHubApiError('An unexpected error occurred'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [service, owner, repo, hasValidParams]);
+
+  useEffect(() => {
+    executeCall();
+  }, [executeCall]);
+
+  const retry = useCallback(() => {
+    executeCall();
+  }, [executeCall]);
+
+  return { data, loading, error, retry };
+}
+
+export function useGitHubWorkflowFiles(owner: string, repo: string) {
+  const service = useGitHubApi();
+  const [data, setData] = useState<string[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<GitHubApiError | null>(null);
+
+  const hasValidParams = Boolean(owner && repo);
+
+  const executeCall = useCallback(async () => {
+    if (!hasValidParams) {
+      setData(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await service.listWorkflowFiles(owner, repo);
+      setData(result);
+    } catch (err) {
+      if (err instanceof GitHubApiError) {
+        setError(err);
+      } else {
+        setError(new GitHubApiError('An unexpected error occurred'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [service, owner, repo, hasValidParams]);
+
+  useEffect(() => {
+    executeCall();
+  }, [executeCall]);
+
+  const retry = useCallback(() => {
+    executeCall();
+  }, [executeCall]);
+
+  return { data, loading, error, retry };
 }

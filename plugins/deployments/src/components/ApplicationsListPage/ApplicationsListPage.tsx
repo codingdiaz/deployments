@@ -344,14 +344,6 @@ export const ApplicationsListPage = () => {
         <Header title="Deployments" subtitle="Manage deployments across your applications" />
         <Content>
           <ContentHeader title="Applications">
-            <SupportButton>
-              View and manage deployments for applications you own or all registered applications.
-              Use the toggle to switch between views.
-            </SupportButton>
-          </ContentHeader>
-
-          {/* View Toggle */}
-          <Box className={classes.viewToggleContainer}>
             <ViewToggle
               currentView={state.currentView}
               onViewChange={handleViewChange}
@@ -359,7 +351,11 @@ export const ApplicationsListPage = () => {
               totalCount={state.totalApplications}
               disabled={state.ownershipLoading || !state.user}
             />
-          </Box>
+            <SupportButton>
+              View and manage deployments for applications you own or all registered applications.
+              Use the toggle to switch between views.
+            </SupportButton>
+          </ContentHeader>
 
           {/* Ownership Error Display */}
           {state.ownershipError && (

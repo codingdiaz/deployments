@@ -229,6 +229,7 @@ export const EnvironmentDetailsPage = () => {
       currentEnv.workflowPath,
       environmentName || '',
       version,
+      componentName,
     );
 
     if (result) {
@@ -465,6 +466,7 @@ export const EnvironmentDetailsPage = () => {
           environmentName={environmentName || ''}
           loading={triggerLoading}
           error={triggerError}
+          githubRepo={currentEnv?.githubRepo}
           onClose={() => setTriggerFormOpen(false)}
           onSubmit={handleTriggerDeployment}
         />

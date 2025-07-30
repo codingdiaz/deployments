@@ -378,19 +378,19 @@ export const EnvironmentCard: React.FC<EnvironmentCardProps> = ({
               {/* Deploy time and user in compact format */}
               {(deploymentStatus?.deployedAt || deploymentStatus?.deployedBy) && (
                 <Box display="flex" alignItems="center" gap={0.5}>
-                  {deploymentStatus.deployedBy?.avatar_url && (
-                    <img 
-                      src={deploymentStatus.deployedBy.avatar_url}
-                      alt={`${deploymentStatus.deployedBy.login}'s avatar`}
-                      style={{ width: 16, height: 16, borderRadius: '50%' }}
-                    />
-                  )}
-                  <Typography className={classes.deployedAt}>
+                  <Typography className={classes.deployedAt} component="div" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     {deploymentStatus.deployedAt && (
                       <span>
                         {formatDeployedAt(new Date(deploymentStatus.deployedAt))}
                         {deploymentStatus.deployedBy && ' by '}
                       </span>
+                    )}
+                    {deploymentStatus.deployedBy?.avatar_url && (
+                      <img 
+                        src={deploymentStatus.deployedBy.avatar_url}
+                        alt={`${deploymentStatus.deployedBy.login}'s avatar`}
+                        style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0 }}
+                      />
                     )}
                     {deploymentStatus.deployedBy && (
                       deploymentStatus.deployedBy.html_url ? (

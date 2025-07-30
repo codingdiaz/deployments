@@ -1,8 +1,9 @@
 ## Ad-Hoc document of TODO's and Found Issues
 
-- We recently swapped out the GitHub Service API to use the GitHub deployments API. While that works great for reading data, in our setup we actually want to just trigger a GitHub action workflow with workflow disbatch to trigger a deployment rather than trigger a deployment via the deployment's API. GitHub will handle creating and managing that workflow's deployment status so the read functionality will just work. Can you revert the functionality of triggering a deployment to use an environment's config to simply trigger a GitHub action workflow if it exists in the environment settings.
-- We no longer need certain settings on the environment page. For example, we no longer care about the job name.
-- We should auto populate Workflow paths in the environment create/edit
+
+FIX LINTING/BUILDING
+
+- We need to update how we pass in the repo slug.
 - Make sure we are using API Refs https://backstage.io/docs/api/utility-apis/
 - Approvals testing/working example
 - We need a sidebar component

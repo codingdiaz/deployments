@@ -10,8 +10,14 @@ import {
   Typography,
   CircularProgress,
   Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
 } from '@material-ui/core';
 import { ErrorDisplay } from '../ErrorHandling';
+import { useGitHubEnvironments, useGitHubWorkflowFiles } from '../../hooks/useGitHubApi';
 import {
   EnvironmentConfig,
   CreateEnvironmentRequest,
@@ -43,6 +49,10 @@ interface EnvironmentConfigFormProps {
   loading?: boolean;
   /** Error message to display */
   error?: string | null;
+  /** GitHub repository (owner/repo) for fetching data */
+  githubRepo?: string;
+  /** List of existing environment names to prevent duplicates */
+  existingEnvironmentNames?: string[];
 }
 
 /**
@@ -55,8 +65,29 @@ export const EnvironmentConfigForm: React.FC<EnvironmentConfigFormProps> = ({
   existingEnvironment,
   loading = false,
   error = null,
+  githubRepo,
+  existingEnvironmentNames = [],
 }) => {
   const isEditing = Boolean(existingEnvironment);
+
+  // Parse GitHub repo info
+  const repoInfo = githubRepo ? {
+    owner: githubRepo.split('/')[0],
+    repo: githubRepo.split('/')[1],
+  } : null;
+
+  // Fetch GitHub data only when we have valid repo info
+  const environmentsQuery = useGitHubEnvironments(
+    repoInfo?.owner || '', 
+    repoInfo?.repo || ''
+  );
+  const workflowsQuery = useGitHubWorkflowFiles(
+    repoInfo?.owner || '', 
+    repoInfo?.repo || ''
+  );
+
+  // Check if we have valid repo info for API calls
+  const hasValidRepoInfo = Boolean(repoInfo?.owner && repoInfo?.repo);
 
   const [formData, setFormData] = useState<FormData>({
     environmentName: '',
@@ -95,6 +126,8 @@ export const EnvironmentConfigForm: React.FC<EnvironmentConfigFormProps> = ({
     } else if (!/^[a-zA-Z0-9-_]+$/.test(formData.environmentName)) {
       errors.environmentName =
         'Environment name can only contain letters, numbers, hyphens, and underscores';
+    } else if (!isEditing && existingEnvironmentNames.includes(formData.environmentName)) {
+      errors.environmentName = 'An environment with this name already exists';
     }
 
 
@@ -111,16 +144,6 @@ export const EnvironmentConfigForm: React.FC<EnvironmentConfigFormProps> = ({
     return Object.keys(errors).length === 0;
   };
 
-  const handleInputChange =
-    (field: keyof FormData) => (event: React.ChangeEvent<HTMLInputElement>) => {
-      const value = event.target.value;
-      setFormData(prev => ({ ...prev, [field]: value }));
-
-      // Clear error for this field when user starts typing
-      if (formErrors[field]) {
-        setFormErrors(prev => ({ ...prev, [field]: undefined }));
-      }
-    };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -192,42 +215,148 @@ export const EnvironmentConfigForm: React.FC<EnvironmentConfigFormProps> = ({
           <Grid container spacing={2}>
             <Grid item xs={12}>
               <Typography variant="body2" color="textSecondary" gutterBottom>
-                Configure a deployment environment for this application. The
-                GitHub repository is inherited from the application's source
-                location annotation.
+                Configure a deployment environment for this application. Environment names 
+                should match your GitHub repository environments for proper deployment tracking.
+                The GitHub repository is inherited from the application's source location annotation.
               </Typography>
             </Grid>
 
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Environment Name"
-                value={formData.environmentName}
-                onChange={handleInputChange('environmentName')}
-                error={Boolean(formErrors.environmentName)}
-                helperText={
-                  formErrors.environmentName || 'e.g., staging, production'
-                }
-                disabled={isEditing || isSubmitting}
-                required
-                placeholder="staging"
-              />
+              {(!hasValidRepoInfo || (environmentsQuery.error || (environmentsQuery.data && environmentsQuery.data.length === 0))) && !environmentsQuery.loading ? (
+                // Fallback to text field when GitHub environments can't be loaded
+                <TextField
+                  fullWidth
+                  label="Environment Name"
+                  value={formData.environmentName}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData(prev => ({ ...prev, environmentName: value }));
+                    if (formErrors.environmentName) {
+                      setFormErrors(prev => ({ ...prev, environmentName: undefined }));
+                    }
+                  }}
+                  error={Boolean(formErrors.environmentName)}
+                  helperText={
+                    formErrors.environmentName || 
+                    (!hasValidRepoInfo 
+                      ? 'Enter an environment name (e.g., staging, production)'
+                      : 'Enter an environment name that matches your GitHub repository environments'
+                    )
+                  }
+                  disabled={isEditing || isSubmitting}
+                  required
+                  placeholder="e.g., staging, production"
+                />
+              ) : (
+                // Use dropdown when GitHub environments are available
+                <FormControl 
+                  fullWidth 
+                  error={Boolean(formErrors.environmentName)} 
+                  disabled={isEditing || isSubmitting}
+                  required
+                >
+                  <InputLabel>Environment Name</InputLabel>
+                  <Select
+                    value={formData.environmentName}
+                    onChange={(e) => {
+                      const value = e.target.value as string;
+                      setFormData(prev => ({ ...prev, environmentName: value }));
+                      if (formErrors.environmentName) {
+                        setFormErrors(prev => ({ ...prev, environmentName: undefined }));
+                      }
+                    }}
+                    label="Environment Name"
+                  >
+                    {environmentsQuery.loading ? (
+                      <MenuItem disabled>
+                        <CircularProgress size={16} /> Loading environments...
+                      </MenuItem>
+                    ) : (
+                      environmentsQuery.data
+                        ?.filter(env => isEditing || !existingEnvironmentNames.includes(env))
+                        .map((env) => (
+                          <MenuItem key={env} value={env}>
+                            {env}
+                          </MenuItem>
+                        ))
+                    )}
+                    {!isEditing && environmentsQuery.data && environmentsQuery.data.length === 0 && (
+                      <MenuItem value="" disabled>
+                        <Typography variant="body2" color="textSecondary">
+                          No GitHub environments found
+                        </Typography>
+                      </MenuItem>
+                    )}
+                  </Select>
+                  <FormHelperText>
+                    {formErrors.environmentName || 'Select an environment name from your GitHub repository'}
+                  </FormHelperText>
+                </FormControl>
+              )}
             </Grid>
 
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Workflow Path (Optional)"
-                value={formData.workflowPath}
-                onChange={handleInputChange('workflowPath')}
-                error={Boolean(formErrors.workflowPath)}
-                helperText={
-                  formErrors.workflowPath ||
-                  'Path to the GitHub Actions workflow file (required for deployment triggers)'
-                }
-                disabled={isSubmitting}
-                placeholder=".github/workflows/deploy.yml"
-              />
+              {!hasValidRepoInfo ? (
+                <TextField
+                  fullWidth
+                  label="Workflow Path (Optional)"
+                  value={formData.workflowPath}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData(prev => ({ ...prev, workflowPath: value }));
+                    if (formErrors.workflowPath) {
+                      setFormErrors(prev => ({ ...prev, workflowPath: undefined }));
+                    }
+                  }}
+                  error={Boolean(formErrors.workflowPath)}
+                  helperText={
+                    formErrors.workflowPath || 'Path to the GitHub Actions workflow file (e.g., .github/workflows/deploy.yml)'
+                  }
+                  disabled={isSubmitting}
+                  placeholder=".github/workflows/deploy.yml"
+                />
+              ) : (
+                <FormControl 
+                  fullWidth 
+                  error={Boolean(formErrors.workflowPath)} 
+                  disabled={isSubmitting}
+                >
+                  <InputLabel>Workflow Path (Optional)</InputLabel>
+                  <Select
+                    value={formData.workflowPath}
+                    onChange={(e) => {
+                      const value = e.target.value as string;
+                      setFormData(prev => ({ ...prev, workflowPath: value }));
+                      if (formErrors.workflowPath) {
+                        setFormErrors(prev => ({ ...prev, workflowPath: undefined }));
+                      }
+                    }}
+                    label="Workflow Path (Optional)"
+                  >
+                    <MenuItem value="">
+                      <Typography color="textSecondary">None selected</Typography>
+                    </MenuItem>
+                    {workflowsQuery.loading ? (
+                      <MenuItem disabled>
+                        <CircularProgress size={16} /> Loading workflows...
+                      </MenuItem>
+                    ) : workflowsQuery.error ? (
+                      <MenuItem disabled>
+                        <Typography color="error">Failed to load workflows</Typography>
+                      </MenuItem>
+                    ) : (
+                      workflowsQuery.data?.map((workflow) => (
+                        <MenuItem key={workflow} value={workflow}>
+                          {workflow}
+                        </MenuItem>
+                      ))
+                    )}
+                  </Select>
+                  <FormHelperText>
+                    {formErrors.workflowPath || 'Select a GitHub Actions workflow file (required for deployment triggers)'}
+                  </FormHelperText>
+                </FormControl>
+              )}
             </Grid>
 
           </Grid>

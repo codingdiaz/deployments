@@ -51,7 +51,7 @@ export const useViewToggle = () => {
 
         return unsubscribe;
       } catch (error) {
-        console.error('Failed to initialize ViewStateManager:', error);
+        // Silently handle ViewStateManager initialization errors
       }
     };
 
@@ -93,7 +93,6 @@ export const useViewToggle = () => {
           setOwnedCount(ownedApps.length);
         }
       } catch (error) {
-        console.error('Failed to load applications:', error);
         setViewState(prev => ({
           ...prev,
           error: error instanceof Error ? error.message : 'Failed to load applications',
@@ -116,7 +115,7 @@ export const useViewToggle = () => {
       const userIdentity = await identityApi.getBackstageIdentity();
       await viewStateManager.getFilteredApplications(allApplications, userIdentity);
     } catch (error) {
-      console.error('Failed to change view:', error);
+      // Silently handle view change errors
     }
   }, [viewStateManager, allApplications, identityApi]);
 

@@ -11,10 +11,12 @@ import {
   ContentHeader,
   SupportButton,
 } from '@backstage/core-components';
-import { useRouteRef } from '@backstage/core-plugin-api';
+import { useRouteRef, useApi } from '@backstage/core-plugin-api';
+import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { rootRouteRef } from '../../routes';
 import { useGitHubWorkflows } from '../../hooks/useGitHubApi';
 import { useEnvironments } from '../../hooks/useDeploymentApi';
+import { useAsync } from 'react-use';
 import { ErrorDisplay, ErrorBoundary } from '../ErrorHandling';
 import { EnvironmentCardSkeleton, WorkflowListSkeleton } from '../LoadingSkeletons';
 import { EnvironmentConfigForm } from '../EnvironmentConfigForm';
@@ -24,12 +26,14 @@ import {
   CreateEnvironmentRequest,
   UpdateEnvironmentRequest,
   EnvironmentConfig,
+  ANNOTATIONS,
 } from '@internal/plugin-deployments-common';
 
 
 export const ApplicationDeploymentPage = () => {
   const { componentName } = useParams<{ componentName: string }>();
   const rootRoute = useRouteRef(rootRouteRef);
+  const catalogApi = useApi(catalogApiRef);
   
   const {
     environments,
@@ -40,6 +44,39 @@ export const ApplicationDeploymentPage = () => {
     updateEnvironment,
     deleteEnvironment,
   } = useEnvironments(componentName || '');
+
+  // Fetch the application entity to get GitHub repo info
+  const { value: entity } = useAsync(async () => {
+    if (!componentName) return null;
+    try {
+      return await catalogApi.getEntityByRef(`component:default/${componentName}`);
+    } catch (error) {
+      return null;
+    }
+  }, [componentName, catalogApi]);
+
+  // Extract GitHub repo from entity or existing environments
+  const getGitHubRepo = (): string | undefined => {
+    // First try to get from entity (always available)
+    if (entity?.metadata.annotations?.[ANNOTATIONS.SOURCE_LOCATION]) {
+      const sourceLocation = entity.metadata.annotations[ANNOTATIONS.SOURCE_LOCATION];
+      const match = sourceLocation.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+      if (match) {
+        const owner = match[1];
+        const repo = match[2].replace(/\.git$/, '');
+        return `${owner}/${repo}`;
+      }
+    }
+    
+    // Fallback to existing environments
+    if (environments.length > 0) {
+      return environments[0].githubRepo;
+    }
+    
+    return undefined;
+  };
+
+  const githubRepo = getGitHubRepo();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingEnvironment, setEditingEnvironment] = useState<EnvironmentConfig | undefined>();
@@ -109,9 +146,9 @@ export const ApplicationDeploymentPage = () => {
                 <Link to={rootRoute()}>
                   <Button variant="outlined">← Back to Applications</Button>
                 </Link>
-                {environments.length > 0 && (
+                {githubRepo && (
                   <GitHubRepoLink 
-                    repo={environments[0].githubRepo}
+                    repo={githubRepo}
                     variant="body2"
                     iconSize="0.875rem"
                   />
@@ -196,6 +233,8 @@ export const ApplicationDeploymentPage = () => {
           onSubmit={handleFormSubmit}
           existingEnvironment={editingEnvironment}
           error={formError}
+          githubRepo={githubRepo}
+          existingEnvironmentNames={environments.map(env => env.environmentName)}
         />
         </Content>
       </Page>

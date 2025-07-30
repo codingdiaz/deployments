@@ -55,7 +55,6 @@ export const EnvironmentCardWithStatus: React.FC<EnvironmentCardWithStatusProps>
       await retryWithBackoff.execute();
     } catch (err) {
       // Error is already handled by the retry hook
-      console.warn('Retry failed:', err);
     }
   }, [retryWithBackoff]);
 

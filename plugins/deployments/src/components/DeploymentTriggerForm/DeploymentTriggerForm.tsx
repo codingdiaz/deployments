@@ -11,6 +11,14 @@ import {
   CircularProgress,
   makeStyles,
   Theme,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
+  Chip,
+  Tabs,
+  Tab,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 import {
@@ -18,6 +26,7 @@ import {
   Launch as LaunchIcon,
 } from '@material-ui/icons';
 import { GitHubApiError } from '../../services/GitHubApiService';
+import { useGitHubBranches, useGitHubTags } from '../../hooks/useGitHubApi';
 import { ErrorDisplay } from '../ErrorHandling';
 
 const useStyles = makeStyles((theme: Theme) => ({
@@ -37,10 +46,11 @@ const useStyles = makeStyles((theme: Theme) => ({
   },
   environmentValue: {
     fontFamily: 'monospace',
-    backgroundColor: theme.palette.grey[100],
+    backgroundColor: theme.palette.type === 'dark' ? theme.palette.grey[800] : theme.palette.grey[100],
     padding: theme.spacing(1),
     borderRadius: theme.shape.borderRadius,
     color: theme.palette.text.primary,
+    border: `1px solid ${theme.palette.divider}`,
   },
   successContainer: {
     display: 'flex',
@@ -62,6 +72,8 @@ interface DeploymentTriggerFormProps {
   loading?: boolean;
   /** Error from the trigger operation */
   error?: GitHubApiError | null;
+  /** GitHub repository (owner/repo) for fetching branches and tags */
+  githubRepo?: string;
   /** Callback when dialog should close */
   onClose: () => void;
   /** Callback when form is submitted */
@@ -79,17 +91,53 @@ export const DeploymentTriggerForm: React.FC<DeploymentTriggerFormProps> = ({
   environmentName,
   loading = false,
   error,
+  githubRepo,
   onClose,
   onSubmit,
 }) => {
   const classes = useStyles();
-  const [version, setVersion] = useState('main');
+  const [version, setVersion] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successResult, setSuccessResult] = useState<{
     workflowUrl: string;
     workflowRunUrl: string | null;
     workflowId: number;
   } | null>(null);
+  const [selectedTab, setSelectedTab] = useState(0); // 0 = branches, 1 = tags
+
+  // Parse GitHub repo info
+  const repoInfo = githubRepo ? {
+    owner: githubRepo.split('/')[0],
+    repo: githubRepo.split('/')[1],
+  } : null;
+
+  // Fetch branches and tags
+  const branchesQuery = useGitHubBranches(
+    repoInfo?.owner || '',
+    repoInfo?.repo || ''
+  );
+  const tagsQuery = useGitHubTags(
+    repoInfo?.owner || '',
+    repoInfo?.repo || ''
+  );
+
+  const hasValidRepoInfo = Boolean(repoInfo?.owner && repoInfo?.repo);
+
+  // Set default branch when branches load
+  React.useEffect(() => {
+    if (branchesQuery.data && branchesQuery.data.length > 0 && !version && selectedTab === 0) {
+      // Try to find 'main' or 'master' branch, otherwise use the first branch
+      const defaultBranch = branchesQuery.data.find(b => b.name === 'main') ||
+                           branchesQuery.data.find(b => b.name === 'master') ||
+                           branchesQuery.data[0];
+      setVersion(defaultBranch.name);
+    }
+  }, [branchesQuery.data, version, selectedTab]);
+
+  // Reset version when switching tabs
+  React.useEffect(() => {
+    setVersion('');
+  }, [selectedTab]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -153,27 +201,103 @@ export const DeploymentTriggerForm: React.FC<DeploymentTriggerFormProps> = ({
               <Box className={classes.environmentValue}>{environmentName}</Box>
             </Box>
 
-            <TextField
-              label="Version"
-              value={version}
-              onChange={e => setVersion(e.target.value)}
-              placeholder="main"
-              helperText="Enter a tag name, commit SHA, or branch name to deploy"
-              fullWidth
-              required
-              disabled={isDisabled}
-              className={classes.field}
-              variant="outlined"
-            />
+            {hasValidRepoInfo ? (
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  Use workflow from
+                </Typography>
+                <Tabs 
+                  value={selectedTab} 
+                  onChange={(_, newValue) => setSelectedTab(newValue)}
+                  indicatorColor="primary"
+                  textColor="primary"
+                  variant="fullWidth"
+                >
+                  <Tab label="Branch" />
+                  <Tab label="Tag" />
+                </Tabs>
+                
+                <Box mt={2}>
+                  {selectedTab === 0 && (
+                    <FormControl fullWidth variant="outlined" disabled={isDisabled}>
+                      <InputLabel>Select Branch</InputLabel>
+                      <Select
+                        value={version}
+                        onChange={e => setVersion(e.target.value as string)}
+                        label="Select Branch"
+                      >
+                        {branchesQuery.loading ? (
+                          <MenuItem disabled>
+                            <CircularProgress size={16} /> Loading branches...
+                          </MenuItem>
+                        ) : branchesQuery.error ? (
+                          <MenuItem disabled>
+                            <Typography color="error">Failed to load branches</Typography>
+                          </MenuItem>
+                        ) : (
+                          branchesQuery.data?.map((branch) => (
+                            <MenuItem key={branch.name} value={branch.name}>
+                              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
+                                <Typography>{branch.name}</Typography>
+                                <Chip size="small" label={branch.sha.substring(0, 7)} />
+                              </Box>
+                            </MenuItem>
+                          ))
+                        )}
+                      </Select>
+                      <FormHelperText>Select a branch to deploy from</FormHelperText>
+                    </FormControl>
+                  )}
+                  
+                  {selectedTab === 1 && (
+                    <FormControl fullWidth variant="outlined" disabled={isDisabled}>
+                      <InputLabel>Select Tag</InputLabel>
+                      <Select
+                        value={version}
+                        onChange={e => setVersion(e.target.value as string)}
+                        label="Select Tag"
+                      >
+                        {tagsQuery.loading ? (
+                          <MenuItem disabled>
+                            <CircularProgress size={16} /> Loading tags...
+                          </MenuItem>
+                        ) : tagsQuery.error ? (
+                          <MenuItem disabled>
+                            <Typography color="error">Failed to load tags</Typography>
+                          </MenuItem>
+                        ) : (
+                          tagsQuery.data?.map((tag) => (
+                            <MenuItem key={tag.name} value={tag.name}>
+                              <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
+                                <Typography>{tag.name}</Typography>
+                                <Chip size="small" label={tag.commit.sha.substring(0, 7)} />
+                              </Box>
+                            </MenuItem>
+                          ))
+                        )}
+                      </Select>
+                      <FormHelperText>Select a tag to deploy</FormHelperText>
+                    </FormControl>
+                  )}
+                </Box>
+              </Box>
+            ) : (
+              <Box>
+                <Typography variant="subtitle2" color="error" gutterBottom>
+                  GitHub Repository Required
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  To trigger deployments, this environment needs a configured GitHub repository. 
+                  Deployments can only be triggered from valid branches or tags.
+                </Typography>
+              </Box>
+            )}
 
             {successResult ? (
               <Alert severity="success" variant="outlined">
-                <Box className={classes.successContainer}>
-                  <CheckCircleIcon className={classes.successIcon} />
-                  <Typography variant="body2">
-                    <strong>Deployment triggered successfully!</strong>
-                  </Typography>
-                </Box>
+                <Typography variant="body2">
+                  <strong>Deployment triggered successfully!</strong>
+                </Typography>
                 <Typography variant="body2" style={{ marginTop: 8 }}>
                   Your deployment for <strong>{environmentName}</strong> with
                   version <strong>{version}</strong> has been queued.
@@ -206,22 +330,9 @@ export const DeploymentTriggerForm: React.FC<DeploymentTriggerFormProps> = ({
 
         <DialogActions>
           {successResult ? (
-            <>
-              <Button
-                href={successResult.workflowRunUrl || successResult.workflowUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="outlined"
-                endIcon={<LaunchIcon />}
-              >
-                {successResult.workflowRunUrl
-                  ? 'View Workflow Run'
-                  : 'View Workflow'}
-              </Button>
-              <Button onClick={handleClose} variant="contained" color="primary">
-                Close
-              </Button>
-            </>
+            <Button onClick={handleClose} variant="contained" color="primary">
+              Close
+            </Button>
           ) : (
             <>
               <Button onClick={handleClose} disabled={isDisabled}>
@@ -231,7 +342,7 @@ export const DeploymentTriggerForm: React.FC<DeploymentTriggerFormProps> = ({
                 type="submit"
                 variant="contained"
                 color="primary"
-                disabled={isDisabled || !version.trim()}
+                disabled={isDisabled || !version.trim() || !hasValidRepoInfo}
               >
                 {submitting || loading ? (
                   <Box className={classes.loadingContainer}>
