@@ -1,0 +1,1 @@
+export { ApplicationsListPage } from './ApplicationsListPage';

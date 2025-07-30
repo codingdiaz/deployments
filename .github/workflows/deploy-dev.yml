@@ -8,6 +8,11 @@ on:
         required: true
         default: 'main'
         type: string
+      environment:
+        description: 'Target environment name'
+        required: true
+        default: 'dev'
+        type: string
 
 jobs:
   deploy:
