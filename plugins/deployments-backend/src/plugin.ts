@@ -2,7 +2,7 @@ import {
   coreServices,
   createBackendPlugin,
 } from '@backstage/backend-plugin-api';
-import { catalogServiceRef } from '@backstage/plugin-catalog-node/alpha';
+import { catalogServiceRef } from '@backstage/plugin-catalog-node';
 import { createRouter } from './router';
 import { DatabaseEnvironmentStorageService } from './services/EnvironmentStorageService';
 import { initializeDatabase } from './services/database';
@@ -18,13 +18,12 @@ export const deploymentsPlugin = createBackendPlugin({
     env.registerInit({
       deps: {
         logger: coreServices.logger,
-        auth: coreServices.auth,
         httpAuth: coreServices.httpAuth,
         httpRouter: coreServices.httpRouter,
         database: coreServices.database,
         catalog: catalogServiceRef,
       },
-      async init({ logger, auth, httpAuth, httpRouter, database, catalog }) {
+      async init({ logger, httpAuth, httpRouter, database, catalog }) {
         logger.info('Initializing deployments plugin');
 
         // Initialize database and apply migrations
@@ -35,7 +34,6 @@ export const deploymentsPlugin = createBackendPlugin({
 
         httpRouter.use(
           await createRouter({
-            auth,
             httpAuth,
             environmentStorageService,
             catalog,

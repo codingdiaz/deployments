@@ -38,7 +38,6 @@ export class OwnershipResolverService implements OwnershipResolver {
 
   constructor(
     private catalogApi: CatalogApi,
-    private identityApi: IdentityApi,
     config: OwnershipConfig = {}
   ) {
     this.config = {
@@ -154,7 +153,7 @@ export class OwnershipResolverService implements OwnershipResolver {
         continue;
       }
 
-      const ownerRef = typeof owner === 'string' ? owner : owner.toString();
+      const ownerRef = typeof owner === 'string' ? owner : String(owner);
       const ownerInfo = await this.parseOwnerRef(ownerRef);
       ownerMap.set(app.metadata.name, ownerInfo);
 

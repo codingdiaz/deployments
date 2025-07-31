@@ -30,7 +30,6 @@ export const EnvironmentCardWithStatus: React.FC<EnvironmentCardWithStatusProps>
     loading,
     error,
     loadStatus,
-    retry: originalRetry,
   } = useDeploymentStatus(componentName, environment.environmentName);
 
   // Enhanced retry with exponential backoff

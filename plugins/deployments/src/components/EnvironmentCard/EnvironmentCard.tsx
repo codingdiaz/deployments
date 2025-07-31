@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { FC, MouseEvent, useState } from 'react';
 import {
   Card,
   CardContent,
@@ -12,18 +12,15 @@ import {
   Menu,
   MenuItem,
 } from '@material-ui/core';
-import {
-  CheckCircle as SuccessIcon,
-  Error as ErrorIcon,
-  Schedule as RunningIcon,
-  Cancel as CancelledIcon,
-  HelpOutline as IdleIcon,
-  Refresh as RefreshIcon,
-  MoreVert as MoreIcon,
-} from '@material-ui/icons';
+import SuccessIcon from '@material-ui/icons/CheckCircle';
+import ErrorIcon from '@material-ui/icons/Error';
+import RunningIcon from '@material-ui/icons/Schedule';
+import CancelledIcon from '@material-ui/icons/Cancel';
+import IdleIcon from '@material-ui/icons/HelpOutline';
+import RefreshIcon from '@material-ui/icons/Refresh';
+import MoreIcon from '@material-ui/icons/MoreVert';
 import { SvgIcon } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
-import { Link } from '@backstage/core-components';
 import { useRouteRef } from '@backstage/core-plugin-api';
 import { useNavigate } from 'react-router-dom';
 import { environmentDetailsRouteRef } from '../../routes';
@@ -34,7 +31,7 @@ import {
 } from '@internal/plugin-deployments-common';
 
 // GitHub icon component
-const GitHubIcon: React.FC<{ className?: string }> = ({ className }) => (
+const GitHubIcon: FC<{ className?: string }> = ({ className }) => (
   <SvgIcon className={className} viewBox="0 0 24 24">
     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
   </SvgIcon>
@@ -209,12 +206,11 @@ function formatDeployedAt(deployedAt: Date): string {
     return `${diffHours}h ago`;
   } else if (diffDays < 7) {
     return `${diffDays}d ago`;
-  } else {
-    return deployedAt.toLocaleDateString();
   }
+  return deployedAt.toLocaleDateString();
 }
 
-export const EnvironmentCard: React.FC<EnvironmentCardProps> = ({
+export const EnvironmentCard: FC<EnvironmentCardProps> = ({
   environment,
   deploymentStatus,
   loading = false,
@@ -233,7 +229,7 @@ export const EnvironmentCard: React.FC<EnvironmentCardProps> = ({
     ? getStatusDisplay(deploymentStatus.status, classes)
     : getStatusDisplay('idle', classes);
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+  const handleMenuOpen = (event: MouseEvent<HTMLElement>) => {
     setMenuAnchorEl(event.currentTarget);
   };
 
@@ -324,7 +320,7 @@ export const EnvironmentCard: React.FC<EnvironmentCardProps> = ({
       
       <CardContent className={classes.cardContent}>
         <Box display="flex" alignItems="flex-start" justifyContent="space-between" marginBottom={1} paddingRight={6}>
-          <Box display="flex" flexDirection="column" gap={0.5}>
+          <Box display="flex" flexDirection="column" style={{ gap: '4px' }}>
             <Typography variant="h6" component="h3">
               {environment.environmentName}
             </Typography>
@@ -341,88 +337,98 @@ export const EnvironmentCard: React.FC<EnvironmentCardProps> = ({
           </Box>
         </Box>
 
-        {loading ? (
-          <Box className={classes.loadingContainer}>
-            <CircularProgress size={20} />
-            <Typography variant="body2" style={{ marginLeft: 8 }}>
-              Loading status...
-            </Typography>
-          </Box>
-        ) : error ? (
-          <Box className={classes.errorContainer}>
-            <Typography variant="body2" color="error" gutterBottom>
-              Failed to load status
-            </Typography>
-            <Typography variant="caption" color="textSecondary">
-              {error}
-            </Typography>
-          </Box>
-        ) : (
-          <>
-            {/* Version and deployment info in one line */}
-            <Box display="flex" alignItems="center" justifyContent="space-between" marginTop={1}>
-              {deploymentStatus?.currentVersion && (
-                <a
-                  href={`https://github.com/${environment.githubRepo}/commit/${deploymentStatus.currentVersion.startsWith('v') ? deploymentStatus.currentVersion.slice(1) : deploymentStatus.currentVersion}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={classes.versionText}
-                  onClick={(e) => e.stopPropagation()}
-                  title="View commit on GitHub"
-                  style={{ textDecoration: 'none', color: 'inherit' }}
-                >
-                  {deploymentStatus.currentVersion}
-                </a>
-              )}
-              
-              {/* Deploy time and user in compact format */}
-              {(deploymentStatus?.deployedAt || deploymentStatus?.deployedBy) && (
-                <Box display="flex" alignItems="center" gap={0.5}>
-                  <Typography className={classes.deployedAt} component="div" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {deploymentStatus.deployedAt && (
-                      <span>
-                        {formatDeployedAt(new Date(deploymentStatus.deployedAt))}
-                        {deploymentStatus.deployedBy && ' by '}
-                      </span>
-                    )}
-                    {deploymentStatus.deployedBy?.avatar_url && (
-                      <img 
-                        src={deploymentStatus.deployedBy.avatar_url}
-                        alt={`${deploymentStatus.deployedBy.login}'s avatar`}
-                        style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0 }}
-                      />
-                    )}
-                    {deploymentStatus.deployedBy && (
-                      deploymentStatus.deployedBy.html_url ? (
-                        <a
-                          href={deploymentStatus.deployedBy.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ 
-                            textDecoration: 'none', 
-                            color: 'inherit',
-                            fontWeight: 500
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {deploymentStatus.deployedBy.login}
-                        </a>
-                      ) : (
-                        <span style={{ fontWeight: 500 }}>
-                          {deploymentStatus.deployedBy.login}
+        {(() => {
+          if (loading) {
+            return (
+              <Box className={classes.loadingContainer}>
+                <CircularProgress size={20} />
+                <Typography variant="body2" style={{ marginLeft: 8 }}>
+                  Loading status...
+                </Typography>
+              </Box>
+            );
+          }
+          
+          if (error) {
+            return (
+              <Box className={classes.errorContainer}>
+                <Typography variant="body2" color="error" gutterBottom>
+                  Failed to load status
+                </Typography>
+                <Typography variant="caption" color="textSecondary">
+                  {error}
+                </Typography>
+              </Box>
+            );
+          }
+          
+          return (
+            <>
+              {/* Version and deployment info in one line */}
+              <Box display="flex" alignItems="center" justifyContent="space-between" marginTop={1}>
+                {deploymentStatus?.currentVersion && (
+                  <a
+                    href={`https://github.com/${environment.githubRepo}/commit/${deploymentStatus.currentVersion.startsWith('v') ? deploymentStatus.currentVersion.slice(1) : deploymentStatus.currentVersion}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={classes.versionText}
+                    onClick={(e) => e.stopPropagation()}
+                    title="View commit on GitHub"
+                    style={{ textDecoration: 'none', color: 'inherit' }}
+                  >
+                    {deploymentStatus.currentVersion}
+                  </a>
+                )}
+                
+                {/* Deploy time and user in compact format */}
+                {(deploymentStatus?.deployedAt || deploymentStatus?.deployedBy) && (
+                  <Box display="flex" alignItems="center" style={{ gap: '4px' }}>
+                    <Typography className={classes.deployedAt} component="div" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {deploymentStatus.deployedAt && (
+                        <span>
+                          {formatDeployedAt(new Date(deploymentStatus.deployedAt))}
+                          {deploymentStatus.deployedBy && ' by '}
                         </span>
-                      )
-                    )}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </>
-        )}
+                      )}
+                      {deploymentStatus.deployedBy?.avatar_url && (
+                        <img 
+                          src={deploymentStatus.deployedBy.avatar_url}
+                          alt={`${deploymentStatus.deployedBy.login}'s avatar`}
+                          style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0 }}
+                        />
+                      )}
+                      {deploymentStatus.deployedBy && (
+                        deploymentStatus.deployedBy.html_url ? (
+                          <a
+                            href={deploymentStatus.deployedBy.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ 
+                              textDecoration: 'none', 
+                              color: 'inherit',
+                              fontWeight: 500
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {deploymentStatus.deployedBy.login}
+                          </a>
+                        ) : (
+                          <span style={{ fontWeight: 500 }}>
+                            {deploymentStatus.deployedBy.login}
+                          </span>
+                        )
+                      )}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </>
+          );
+        })()}
       </CardContent>
 
       <CardActions className={classes.cardActions}>
-        <Box display="flex" gap={1}>
+        <Box display="flex" style={{ gap: '8px' }}>
           {deploymentStatus?.workflowRunUrl && (
             <Button
               size="small"

@@ -2,5 +2,5 @@ export {
   ErrorDisplay,
   GitHubErrorDisplay,
   ErrorBoundary,
-  type ErrorInfo,
+  type ErrorInfoDetails,
 } from './ErrorDisplay';

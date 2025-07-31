@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import { FC, FormEvent, useEffect, useState } from 'react';
 import {
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
   Button,
   Typography,
   Box,
@@ -21,10 +20,7 @@ import {
   Tab,
 } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
-import {
-  CheckCircle as CheckCircleIcon,
-  Launch as LaunchIcon,
-} from '@material-ui/icons';
+import LaunchIcon from '@material-ui/icons/Launch';
 import { GitHubApiError } from '../../services/GitHubApiService';
 import { useGitHubBranches, useGitHubTags } from '../../hooks/useGitHubApi';
 import { ErrorDisplay } from '../ErrorHandling';
@@ -86,7 +82,7 @@ interface DeploymentTriggerFormProps {
   } | null>;
 }
 
-export const DeploymentTriggerForm: React.FC<DeploymentTriggerFormProps> = ({
+export const DeploymentTriggerForm: FC<DeploymentTriggerFormProps> = ({
   open,
   environmentName,
   loading = false,
@@ -124,7 +120,7 @@ export const DeploymentTriggerForm: React.FC<DeploymentTriggerFormProps> = ({
   const hasValidRepoInfo = Boolean(repoInfo?.owner && repoInfo?.repo);
 
   // Set default branch when branches load
-  React.useEffect(() => {
+  useEffect(() => {
     if (branchesQuery.data && branchesQuery.data.length > 0 && !version && selectedTab === 0) {
       // Try to find 'main' or 'master' branch, otherwise use the first branch
       const defaultBranch = branchesQuery.data.find(b => b.name === 'main') ||
@@ -135,11 +131,11 @@ export const DeploymentTriggerForm: React.FC<DeploymentTriggerFormProps> = ({
   }, [branchesQuery.data, version, selectedTab]);
 
   // Reset version when switching tabs
-  React.useEffect(() => {
+  useEffect(() => {
     setVersion('');
   }, [selectedTab]);
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
     if (!version.trim()) {
@@ -226,24 +222,32 @@ export const DeploymentTriggerForm: React.FC<DeploymentTriggerFormProps> = ({
                         onChange={e => setVersion(e.target.value as string)}
                         label="Select Branch"
                       >
-                        {branchesQuery.loading ? (
-                          <MenuItem disabled>
-                            <CircularProgress size={16} /> Loading branches...
-                          </MenuItem>
-                        ) : branchesQuery.error ? (
-                          <MenuItem disabled>
-                            <Typography color="error">Failed to load branches</Typography>
-                          </MenuItem>
-                        ) : (
-                          branchesQuery.data?.map((branch) => (
+                        {(() => {
+                          if (branchesQuery.loading) {
+                            return (
+                              <MenuItem disabled>
+                                <CircularProgress size={16} /> Loading branches...
+                              </MenuItem>
+                            );
+                          }
+                          
+                          if (branchesQuery.error) {
+                            return (
+                              <MenuItem disabled>
+                                <Typography color="error">Failed to load branches</Typography>
+                              </MenuItem>
+                            );
+                          }
+                          
+                          return branchesQuery.data?.map((branch) => (
                             <MenuItem key={branch.name} value={branch.name}>
                               <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
                                 <Typography>{branch.name}</Typography>
                                 <Chip size="small" label={branch.sha.substring(0, 7)} />
                               </Box>
                             </MenuItem>
-                          ))
-                        )}
+                          ));
+                        })()}
                       </Select>
                       <FormHelperText>Select a branch to deploy from</FormHelperText>
                     </FormControl>
@@ -257,24 +261,32 @@ export const DeploymentTriggerForm: React.FC<DeploymentTriggerFormProps> = ({
                         onChange={e => setVersion(e.target.value as string)}
                         label="Select Tag"
                       >
-                        {tagsQuery.loading ? (
-                          <MenuItem disabled>
-                            <CircularProgress size={16} /> Loading tags...
-                          </MenuItem>
-                        ) : tagsQuery.error ? (
-                          <MenuItem disabled>
-                            <Typography color="error">Failed to load tags</Typography>
-                          </MenuItem>
-                        ) : (
-                          tagsQuery.data?.map((tag) => (
+                        {(() => {
+                          if (tagsQuery.loading) {
+                            return (
+                              <MenuItem disabled>
+                                <CircularProgress size={16} /> Loading tags...
+                              </MenuItem>
+                            );
+                          }
+                          
+                          if (tagsQuery.error) {
+                            return (
+                              <MenuItem disabled>
+                                <Typography color="error">Failed to load tags</Typography>
+                              </MenuItem>
+                            );
+                          }
+                          
+                          return tagsQuery.data?.map((tag) => (
                             <MenuItem key={tag.name} value={tag.name}>
                               <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
                                 <Typography>{tag.name}</Typography>
                                 <Chip size="small" label={tag.commit.sha.substring(0, 7)} />
                               </Box>
                             </MenuItem>
-                          ))
-                        )}
+                          ));
+                        })()}
                       </Select>
                       <FormHelperText>Select a tag to deploy</FormHelperText>
                     </FormControl>

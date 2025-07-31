@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "yarn lint"
+          },
+          {
+            "type": "command",
+            "command": "yarn tsc"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC } from 'react';
 import {
   Card,
   CardContent,
@@ -35,7 +35,7 @@ const useStyles = makeStyles((theme: Theme) => ({
 /**
  * Loading skeleton for environment cards
  */
-export const EnvironmentCardSkeleton: React.FC = () => {
+export const EnvironmentCardSkeleton: FC = () => {
   const classes = useStyles();
 
   return (
@@ -66,7 +66,7 @@ export const EnvironmentCardSkeleton: React.FC = () => {
 /**
  * Loading skeleton for application cards
  */
-export const ApplicationCardSkeleton: React.FC = () => {
+export const ApplicationCardSkeleton: FC = () => {
   const classes = useStyles();
 
   return (
@@ -98,7 +98,7 @@ export const ApplicationCardSkeleton: React.FC = () => {
 /**
  * Loading skeleton for deployment history table
  */
-export const DeploymentHistoryTableSkeleton: React.FC = () => {
+export const DeploymentHistoryTableSkeleton: FC = () => {
   const classes = useStyles();
 
   return (
@@ -123,7 +123,7 @@ export const DeploymentHistoryTableSkeleton: React.FC = () => {
 /**
  * Loading skeleton for deployment status
  */
-export const DeploymentStatusSkeleton: React.FC = () => {
+export const DeploymentStatusSkeleton: FC = () => {
   return (
     <Box display="flex" alignItems="center" style={{ gap: 16 }}>
       <Skeleton variant="rect" width={80} height={24} style={{ borderRadius: 12 }} />
@@ -137,7 +137,7 @@ export const DeploymentStatusSkeleton: React.FC = () => {
 /**
  * Loading skeleton for workflow list
  */
-export const WorkflowListSkeleton: React.FC = () => {
+export const WorkflowListSkeleton: FC = () => {
   return (
     <Box>
       {Array.from({ length: 3 }).map((_, index) => (
@@ -161,7 +161,7 @@ export const WorkflowListSkeleton: React.FC = () => {
 /**
  * Loading skeleton for form fields
  */
-export const FormFieldSkeleton: React.FC<{ rows?: number }> = ({ rows = 1 }) => {
+export const FormFieldSkeleton: FC<{ rows?: number }> = ({ rows = 1 }) => {
   return (
     <Box marginBottom={2}>
       <Skeleton variant="text" width="30%" height={20} style={{ marginBottom: 8 }} />
@@ -184,7 +184,7 @@ export const FormFieldSkeleton: React.FC<{ rows?: number }> = ({ rows = 1 }) => 
 /**
  * Loading skeleton for page header
  */
-export const PageHeaderSkeleton: React.FC = () => {
+export const PageHeaderSkeleton: FC = () => {
   return (
     <Box marginBottom={3}>
       <Skeleton variant="text" width="40%" height={40} />
@@ -196,7 +196,7 @@ export const PageHeaderSkeleton: React.FC = () => {
 /**
  * Loading skeleton for button group
  */
-export const ButtonGroupSkeleton: React.FC<{ count?: number }> = ({ count = 2 }) => {
+export const ButtonGroupSkeleton: FC<{ count?: number }> = ({ count = 2 }) => {
   return (
     <Box display="flex" style={{ gap: 8 }}>
       {Array.from({ length: count }).map((_, index) => (
@@ -215,7 +215,7 @@ export const ButtonGroupSkeleton: React.FC<{ count?: number }> = ({ count = 2 })
 /**
  * Loading skeleton for navigation breadcrumbs
  */
-export const BreadcrumbSkeleton: React.FC = () => {
+export const BreadcrumbSkeleton: FC = () => {
   return (
     <Box display="flex" alignItems="center" marginBottom={2} style={{ gap: 8 }}>
       <Skeleton variant="rect" width={120} height={32} style={{ borderRadius: 4 }} />
@@ -228,7 +228,7 @@ export const BreadcrumbSkeleton: React.FC = () => {
 /**
  * Loading skeleton for empty state
  */
-export const EmptyStateSkeleton: React.FC = () => {
+export const EmptyStateSkeleton: FC = () => {
   return (
     <Box textAlign="center" padding={4}>
       <Skeleton variant="circle" width={80} height={80} style={{ margin: '0 auto 16px' }} />

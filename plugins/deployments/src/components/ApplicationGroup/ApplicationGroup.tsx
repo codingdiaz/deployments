@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { FC, useEffect, useState } from 'react';
 import {
   Box,
   Card,
@@ -8,21 +8,15 @@ import {
   Grid,
   IconButton,
   Typography,
-  Avatar,
   Chip,
   makeStyles,
   Theme,
 } from '@material-ui/core';
-import {
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Person as PersonIcon,
-  Group as GroupIcon,
-} from '@material-ui/icons';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import { ComponentEntity } from '@backstage/catalog-model';
 import { Link } from '@backstage/core-components';
 import { useRouteRef } from '@backstage/core-plugin-api';
-import { ApplicationGroup, OwnerInfo, ViewMode } from '@internal/plugin-deployments-common';
+import { ApplicationGroup, ViewMode } from '@internal/plugin-deployments-common';
 import { AccessIndicator } from '../AccessIndicator';
 import { GitHubRepoLink } from '../GitHubRepoLink';
 import { applicationDeploymentRouteRef } from '../../routes';
@@ -170,7 +164,7 @@ interface ApplicationCardProps {
   isOwned: boolean;
 }
 
-const ApplicationCard: React.FC<ApplicationCardProps> = ({
+const ApplicationCard: FC<ApplicationCardProps> = ({
   entity,
   showAccessIndicator,
   currentView,
@@ -187,7 +181,7 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({
   const { environments, loading: environmentsLoading, error: environmentsError, loadEnvironments } = useEnvironments(componentName);
 
   // Load environments when component mounts or componentName changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (componentName) {
       loadEnvironments();
     }
@@ -269,7 +263,7 @@ const ApplicationCard: React.FC<ApplicationCardProps> = ({
               label={env.environmentName}
               size="small"
               className={classes.environmentChip}
-              variant="filled"
+              variant="default"
             />
           ))}
         </Box>
@@ -303,7 +297,7 @@ export interface ApplicationGroupProps {
   className?: string;
 }
 
-export const ApplicationGroupComponent: React.FC<ApplicationGroupProps> = ({
+export const ApplicationGroupComponent: FC<ApplicationGroupProps> = ({
   group,
   currentView,
   currentUserRef,
@@ -318,19 +312,6 @@ export const ApplicationGroupComponent: React.FC<ApplicationGroupProps> = ({
     setExpanded(!expanded);
   };
 
-  const getOwnerIcon = (ownerInfo: OwnerInfo) => {
-    return ownerInfo.type === 'user' ? <PersonIcon /> : <GroupIcon />;
-  };
-
-  const getOwnerInitials = (ownerInfo: OwnerInfo) => {
-    const name = ownerInfo.displayName || ownerInfo.name;
-    return name
-      .split(' ')
-      .map(word => word.charAt(0))
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
 
   const isUnassigned = group.owner.name === 'unassigned';
   const cardClassName = `${classes.groupCard} ${isUnassigned ? classes.unassignedGroup : ''} ${className || ''}`;
@@ -373,8 +354,8 @@ export const ApplicationGroupComponent: React.FC<ApplicationGroupProps> = ({
         <CardContent className={classes.groupContent}>
           <Grid container spacing={2}>
             {group.applications.map((application) => {
-              const isOwned = group.isUserGroup || 
-                (currentUserRef && application.spec?.owner === currentUserRef);
+              const isOwned = Boolean(group.isUserGroup || 
+                (currentUserRef && application.spec?.owner === currentUserRef));
               
               return (
                 <Grid item xs={12} sm={6} md={4} key={application.metadata.name}>

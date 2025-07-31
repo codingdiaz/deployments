@@ -1,5 +1,5 @@
-import { HttpAuthService, AuthService } from '@backstage/backend-plugin-api';
-import { CatalogApi } from '@backstage/catalog-client';
+import { HttpAuthService } from '@backstage/backend-plugin-api';
+import { CatalogService } from '@backstage/plugin-catalog-node';
 import { InputError, NotFoundError } from '@backstage/errors';
 import express from 'express';
 import Router from 'express-promise-router';
@@ -14,14 +14,12 @@ import { ANNOTATIONS } from '@internal/plugin-deployments-common';
 
 export async function createRouter({
   httpAuth,
-  auth,
   environmentStorageService,
   catalog,
 }: {
   httpAuth: HttpAuthService;
-  auth: AuthService;
   environmentStorageService: EnvironmentStorageService;
-  catalog: CatalogApi;
+  catalog: CatalogService;
 }): Promise<express.Router> {
   const router = Router();
   router.use(express.json());
@@ -29,12 +27,8 @@ export async function createRouter({
   // Helper function to extract GitHub repository from entity annotations
   const getGitHubRepoFromEntity = async (componentName: string, req: express.Request): Promise<string> => {
     const credentials = await httpAuth.credentials(req);
-    const { token } = await auth.getPluginRequestToken({
-      onBehalfOf: credentials,
-      targetPluginId: 'catalog',
-    });
     
-    const entity = await catalog.getEntityByRef(`component:default/${componentName}`, { token });
+    const entity = await catalog.getEntityByRef(`component:default/${componentName}`, { credentials });
     
     if (!entity) {
       throw new NotFoundError(`Component '${componentName}' not found in catalog`);

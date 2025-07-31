@@ -5,9 +5,9 @@
 import express from 'express';
 import request from 'supertest';
 import { createRouter } from './router';
-import { InMemoryEnvironmentStorageService } from './services/EnvironmentStorageService';
+import { EnvironmentStorageService } from './services/EnvironmentStorageService';
 import { HttpAuthService } from '@backstage/backend-plugin-api';
-import { CatalogApi } from '@backstage/catalog-client';
+import { CatalogService } from '@backstage/plugin-catalog-node';
 import { InputError, NotFoundError } from '@backstage/errors';
 import { ANNOTATIONS } from '@internal/plugin-deployments-common';
 
@@ -18,8 +18,9 @@ const mockHttpAuth: HttpAuthService = {
   listPublicServiceKeys: jest.fn(),
 } as any;
 
-// Mock the CatalogApi
-const mockCatalog: jest.Mocked<CatalogApi> = {
+
+// Mock the CatalogService
+const mockCatalog: jest.Mocked<CatalogService> = {
   getEntityByRef: jest.fn(),
 } as any;
 
@@ -34,12 +35,25 @@ const errorHandler = (err: any, _req: express.Request, res: express.Response, _n
   }
 };
 
+// Mock storage service
+const createMockStorageService = (): jest.Mocked<EnvironmentStorageService> => ({
+  getEnvironments: jest.fn().mockResolvedValue([]),
+  getEnvironment: jest.fn().mockResolvedValue(undefined),
+  createEnvironment: jest.fn(),
+  updateEnvironment: jest.fn(),
+  deleteEnvironment: jest.fn().mockResolvedValue(true),
+  environmentExists: jest.fn().mockResolvedValue(false),
+});
+
 describe('deployments router', () => {
   let app: express.Express;
-  let storageService: InMemoryEnvironmentStorageService;
+  let storageService: jest.Mocked<EnvironmentStorageService>;
 
   beforeEach(async () => {
-    storageService = new InMemoryEnvironmentStorageService();
+    storageService = createMockStorageService();
+    
+    // Mock auth services
+    (mockHttpAuth.credentials as jest.Mock).mockResolvedValue({ principal: { userEntityRef: 'user:default/test' } });
     
     // Mock catalog service to return entity with GitHub source location
     mockCatalog.getEntityByRef.mockResolvedValue({
@@ -76,20 +90,27 @@ describe('deployments router', () => {
 
     it('should return environments for a component', async () => {
       const config = {
+        id: 'env-1',
+        componentName: 'test-component',
         environmentName: 'staging',
         githubRepo: 'owner/repo',
         workflowPath: '.github/workflows/deploy.yml',
-        jobName: 'deploy',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
-      await storageService.createEnvironment('test-component', config);
+      storageService.getEnvironments.mockResolvedValue([config]);
 
       const response = await request(app)
         .get('/environments/test-component')
         .expect(200);
 
       expect(response.body.environments).toHaveLength(1);
-      expect(response.body.environments[0]).toMatchObject(config);
+      expect(response.body.environments[0]).toMatchObject({
+        environmentName: 'staging',
+        githubRepo: 'owner/repo',
+        workflowPath: '.github/workflows/deploy.yml'
+      });
     });
 
     it('should return 400 for invalid component name', async () => {
@@ -104,22 +125,31 @@ describe('deployments router', () => {
   describe('GET /environments/:componentName/:environmentName', () => {
     it('should return specific environment', async () => {
       const config = {
+        id: 'env-1',
+        componentName: 'test-component',
         environmentName: 'staging',
         githubRepo: 'owner/repo',
         workflowPath: '.github/workflows/deploy.yml',
-        jobName: 'deploy',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
-      await storageService.createEnvironment('test-component', config);
+      storageService.getEnvironment.mockResolvedValue(config);
 
       const response = await request(app)
         .get('/environments/test-component/staging')
         .expect(200);
 
-      expect(response.body.environment).toMatchObject(config);
+      expect(response.body.environment).toMatchObject({
+        environmentName: 'staging',
+        githubRepo: 'owner/repo',
+        workflowPath: '.github/workflows/deploy.yml'
+      });
     });
 
     it('should return 404 for non-existent environment', async () => {
+      storageService.getEnvironment.mockResolvedValue(undefined);
+      
       const response = await request(app)
         .get('/environments/test-component/staging')
         .expect(404);
@@ -141,9 +171,19 @@ describe('deployments router', () => {
       const config = {
         environmentName: 'staging',
         workflowPath: '.github/workflows/deploy.yml',
-        jobName: 'deploy',
-        githubEnvironment: 'staging-env',
       };
+      
+      const createdConfig = {
+        id: 'env-1',
+        componentName: 'test-component',
+        environmentName: 'staging',
+        githubRepo: 'owner/repo',
+        workflowPath: '.github/workflows/deploy.yml',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      storageService.createEnvironment.mockResolvedValue(createdConfig);
 
       const response = await request(app)
         .post('/environments/test-component')
@@ -151,10 +191,11 @@ describe('deployments router', () => {
         .expect(201);
 
       expect(response.body.environment).toMatchObject({
-        ...config,
-        githubRepo: 'owner/repo', // Should be extracted from entity annotations
+        environmentName: 'staging',
+        githubRepo: 'owner/repo',
+        workflowPath: '.github/workflows/deploy.yml',
+        componentName: 'test-component'
       });
-      expect(response.body.environment.componentName).toBe('test-component');
       expect(response.body.environment.id).toBeDefined();
       expect(response.body.environment.createdAt).toBeDefined();
       expect(response.body.environment.updatedAt).toBeDefined();
@@ -164,7 +205,6 @@ describe('deployments router', () => {
       const invalidConfig = {
         environmentName: '', // invalid - empty string
         workflowPath: '.github/workflows/deploy.yml',
-        jobName: 'deploy',
       };
 
       const response = await request(app)
@@ -181,7 +221,6 @@ describe('deployments router', () => {
       const config = {
         environmentName: 'staging',
         workflowPath: '.github/workflows/deploy.yml',
-        jobName: 'deploy',
       };
 
       const response = await request(app)
@@ -196,7 +235,6 @@ describe('deployments router', () => {
       const invalidConfig = {
         environmentName: 'staging',
         workflowPath: 'invalid/path.yml', // invalid - not in .github/workflows/
-        jobName: 'deploy',
       };
 
       const response = await request(app)
@@ -211,14 +249,30 @@ describe('deployments router', () => {
       const config = {
         environmentName: 'staging',
         workflowPath: '.github/workflows/deploy.yml',
-        jobName: 'deploy',
+      };
+      
+      const createdConfig = {
+        id: 'env-1',
+        componentName: 'test-component',
+        environmentName: 'staging',
+        githubRepo: 'owner/repo',
+        workflowPath: '.github/workflows/deploy.yml',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
+      // First call succeeds
+      storageService.createEnvironment.mockResolvedValueOnce(createdConfig);
+      storageService.environmentExists.mockResolvedValueOnce(false);
+      
       await request(app)
         .post('/environments/test-component')
         .send(config)
         .expect(201);
 
+      // Second call should indicate environment exists and fail
+      storageService.createEnvironment.mockRejectedValueOnce(new Error('Environment already exists'));
+      
       const response = await request(app)
         .post('/environments/test-component')
         .send(config)
@@ -231,34 +285,49 @@ describe('deployments router', () => {
   describe('PUT /environments/:componentName/:environmentName', () => {
     beforeEach(async () => {
       const config = {
+        id: 'env-1',
+        componentName: 'test-component',
         environmentName: 'staging',
         githubRepo: 'owner/repo',
         workflowPath: '.github/workflows/deploy.yml',
-        jobName: 'deploy',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
-      await storageService.createEnvironment('test-component', config);
+      storageService.getEnvironment.mockResolvedValue(config);
     });
 
     it('should update existing environment', async () => {
       const updates = {
-        jobName: 'new-deploy',
-        githubEnvironment: 'staging-env',
+        workflowPath: '.github/workflows/new-deploy.yml',
       };
+      
+      const updatedConfig = {
+        id: 'env-1',
+        componentName: 'test-component',
+        environmentName: 'staging',
+        githubRepo: 'owner/repo',
+        workflowPath: '.github/workflows/new-deploy.yml',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      storageService.updateEnvironment.mockResolvedValue(updatedConfig);
 
       const response = await request(app)
         .put('/environments/test-component/staging')
         .send(updates)
         .expect(200);
 
-      expect(response.body.environment.githubRepo).toBe('owner/repo'); // unchanged - from entity annotations
-      expect(response.body.environment.jobName).toBe('new-deploy');
-      expect(response.body.environment.githubEnvironment).toBe('staging-env');
-      expect(response.body.environment.workflowPath).toBe('.github/workflows/deploy.yml'); // unchanged
+      expect(response.body.environment.githubRepo).toBe('owner/repo');
+      expect(response.body.environment.workflowPath).toBe('.github/workflows/new-deploy.yml');
+      expect(response.body.environment.environmentName).toBe('staging');
     });
 
     it('should return 404 for non-existent environment', async () => {
-      const updates = { jobName: 'new-job' };
+      const updates = { workflowPath: '.github/workflows/new-deploy.yml' };
+      
+      storageService.updateEnvironment.mockRejectedValueOnce(new Error('Environment not found'));
 
       const response = await request(app)
         .put('/environments/test-component/production')
@@ -272,6 +341,18 @@ describe('deployments router', () => {
       const invalidUpdates = {
         workflowPath: 'invalid/path.yml', // invalid - not in .github/workflows/
       };
+      
+      const existingConfig = {
+        id: 'env-1',
+        componentName: 'test-component',
+        environmentName: 'staging',
+        githubRepo: 'owner/repo',
+        workflowPath: '.github/workflows/deploy.yml',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      storageService.getEnvironment.mockResolvedValue(existingConfig);
 
       const response = await request(app)
         .put('/environments/test-component/staging')
@@ -285,13 +366,17 @@ describe('deployments router', () => {
   describe('DELETE /environments/:componentName/:environmentName', () => {
     beforeEach(async () => {
       const config = {
+        id: 'env-1',
+        componentName: 'test-component',
         environmentName: 'staging',
         githubRepo: 'owner/repo',
         workflowPath: '.github/workflows/deploy.yml',
-        jobName: 'deploy',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
-      await storageService.createEnvironment('test-component', config);
+      storageService.getEnvironment.mockResolvedValue(config);
+      storageService.deleteEnvironment.mockResolvedValue(true);
     });
 
     it('should delete existing environment', async () => {
@@ -299,12 +384,12 @@ describe('deployments router', () => {
         .delete('/environments/test-component/staging')
         .expect(204);
 
-      // Verify it's deleted
-      const environment = await storageService.getEnvironment('test-component', 'staging');
-      expect(environment).toBeUndefined();
+      expect(storageService.deleteEnvironment).toHaveBeenCalledWith('test-component', 'staging');
     });
 
     it('should return 404 for non-existent environment', async () => {
+      storageService.deleteEnvironment.mockResolvedValue(false);
+      
       const response = await request(app)
         .delete('/environments/test-component/production')
         .expect(404);

@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC, ReactNode, ComponentType, ErrorInfo, Component } from 'react';
 import { Alert, AlertTitle } from '@material-ui/lab';
 import { Button, Typography, Box } from '@material-ui/core';
 import { GitHubApiError } from '../../services/GitHubApiService';
@@ -8,7 +8,7 @@ interface GitHubErrorDisplayProps {
   onRetry?: () => void;
 }
 
-export const GitHubErrorDisplay: React.FC<GitHubErrorDisplayProps> = ({
+export const GitHubErrorDisplay: FC<GitHubErrorDisplayProps> = ({
   error,
   onRetry,
 }) => {
@@ -90,8 +90,8 @@ export const GitHubErrorDisplay: React.FC<GitHubErrorDisplayProps> = ({
 };
 
 interface GitHubErrorBoundaryProps {
-  children: React.ReactNode;
-  fallback?: React.ComponentType<{ error: GitHubApiError; retry: () => void }>;
+  children: ReactNode;
+  fallback?: ComponentType<{ error: GitHubApiError; retry: () => void }>;
 }
 
 interface GitHubErrorBoundaryState {
@@ -99,15 +99,10 @@ interface GitHubErrorBoundaryState {
   error: GitHubApiError | null;
 }
 
-export class GitHubErrorBoundary extends React.Component<
+export class GitHubErrorBoundary extends Component<
   GitHubErrorBoundaryProps,
   GitHubErrorBoundaryState
 > {
-  constructor(props: GitHubErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
   static getDerivedStateFromError(error: Error): GitHubErrorBoundaryState {
     if (error instanceof GitHubApiError) {
       return { hasError: true, error };
@@ -118,7 +113,13 @@ export class GitHubErrorBoundary extends React.Component<
     };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  constructor(props: GitHubErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // eslint-disable-next-line no-console
     console.error('GitHub API Error:', error, errorInfo);
   }
 

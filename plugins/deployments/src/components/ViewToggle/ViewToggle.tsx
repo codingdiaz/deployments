@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC } from 'react';
 import {
   Box,
   Button,
@@ -7,10 +7,8 @@ import {
   makeStyles,
   Chip,
 } from '@material-ui/core';
-import {
-  Person as PersonIcon,
-  Group as GroupIcon,
-} from '@material-ui/icons';
+import PersonIcon from '@material-ui/icons/Person';
+import GroupIcon from '@material-ui/icons/Group';
 import { ViewMode } from '@internal/plugin-deployments-common';
 
 const useStyles = makeStyles((theme) => ({
@@ -68,7 +66,7 @@ export interface ViewToggleProps {
   className?: string;
 }
 
-export const ViewToggle: React.FC<ViewToggleProps> = ({
+export const ViewToggle: FC<ViewToggleProps> = ({
   currentView,
   onViewChange,
   ownedCount,

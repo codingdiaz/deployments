@@ -5,8 +5,6 @@
 import { ComponentEntity } from '@backstage/catalog-model';
 import {
   ViewStateManagerService,
-  ViewMode,
-  ViewState,
   ViewStateConfig,
 } from './ViewStateManager';
 import {

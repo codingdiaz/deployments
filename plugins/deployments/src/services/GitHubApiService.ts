@@ -1,6 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { OAuthApi } from '@backstage/core-plugin-api';
-import { DeploymentStatus, DeploymentStatusType, DeploymentHistoryEntry, GitHubUser as CommonGitHubUser } from '@internal/plugin-deployments-common';
+import { DeploymentStatus, DeploymentStatusType, DeploymentHistoryEntry } from '@internal/plugin-deployments-common';
 
 export interface GitHubWorkflow {
   id: number;
@@ -230,7 +230,7 @@ export class GitHubApiService {
       if (error.status === 422) {
         const validationErrors = error.response?.data?.errors || [];
         throw new GitHubApiError(
-          'GitHub API validation error: ' + (error.response?.data?.message || 'Invalid request data'),
+          `GitHub API validation error: ${error.response?.data?.message || 'Invalid request data'}`,
           422,
           'VALIDATION_ERROR',
           {
@@ -629,9 +629,9 @@ export class GitHubApiService {
         id: status.id,
         state: status.state as 'error' | 'failure' | 'inactive' | 'in_progress' | 'queued' | 'pending' | 'success',
         description: status.description,
-        environment: status.environment,
+        environment: status.environment || '',
         target_url: status.target_url,
-        log_url: status.log_url,
+        log_url: status.log_url || null,
         created_at: status.created_at,
         updated_at: status.updated_at,
         deployment_url: status.deployment_url,
@@ -661,16 +661,16 @@ export class GitHubApiService {
       });
 
       return {
-        id: response.data.id,
-        sha: response.data.sha,
-        ref: response.data.ref,
-        environment: response.data.environment,
-        description: response.data.description,
-        payload: response.data.payload,
-        created_at: response.data.created_at,
-        updated_at: response.data.updated_at,
-        statuses_url: response.data.statuses_url,
-        repository_url: response.data.repository_url,
+        id: (response.data as any).id,
+        sha: (response.data as any).sha,
+        ref: (response.data as any).ref,
+        environment: (response.data as any).environment,
+        description: (response.data as any).description,
+        payload: (response.data as any).payload,
+        created_at: (response.data as any).created_at,
+        updated_at: (response.data as any).updated_at,
+        statuses_url: (response.data as any).statuses_url || '',
+        repository_url: (response.data as any).repository_url || '',
       };
     });
   }
@@ -709,154 +709,35 @@ export class GitHubApiService {
     });
   }
 
-  private isWorkflowPathEnvironmentSpecific(workflowPath: string, environmentName: string): boolean {
-    // Strategy 2: If workflow path contains environment name, 
-    // it's likely a separate workflow for that environment
-    const pathLower = workflowPath.toLowerCase();
-    const envLower = environmentName.toLowerCase();
-    
-    return pathLower.includes(envLower) || 
-           pathLower.includes(`${envLower}-`) || 
-           pathLower.includes(`-${envLower}`) ||
-           pathLower.includes(`${envLower}_`) || 
-           pathLower.includes(`_${envLower}`);
-  }
+  // private isWorkflowPathEnvironmentSpecific(workflowPath: string, environmentName: string): boolean {
+  //   // Strategy 2: If workflow path contains environment name, 
+  //   // it's likely a separate workflow for that environment
+  //   const pathLower = workflowPath.toLowerCase();
+  //   const envLower = environmentName.toLowerCase();
+  //   
+  //   return pathLower.includes(envLower) || 
+  //          pathLower.includes(`${envLower}-`) || 
+  //          pathLower.includes(`-${envLower}`) ||
+  //          pathLower.includes(`${envLower}_`) || 
+  //          pathLower.includes(`_${envLower}`);
+  // }
 
-  private async filterRunsByEnvironment(
-    runs: GitHubWorkflowRun[],
-    environmentName: string,
-    owner?: string,
-    repo?: string,
-    workflowPath?: string,
-  ): Promise<GitHubWorkflowRun[]> {
-    const filteredRuns: GitHubWorkflowRun[] = [];
-
-    // Strategy 2: If workflow path is environment-specific, return all runs
-    if (workflowPath && this.isWorkflowPathEnvironmentSpecific(workflowPath, environmentName)) {
-      return runs;
-    }
-
-    for (const run of runs) {
-      try {
-        let isMatchingRun = false;
-
-        // Strategy 1 & 3: Check workflow inputs for environment parameter
-        if (owner && repo) {
-          const runDetails = await this.getWorkflowRun(owner, repo, run.id);
-          
-          // Check for environment in workflow inputs (exact match)
-          if (runDetails.inputs && runDetails.inputs.environment === environmentName) {
-            isMatchingRun = true;
-          }
-
-          // Check for environment in workflow inputs (case-insensitive)
-          if (!isMatchingRun && runDetails.inputs && runDetails.inputs.environment) {
-            if (runDetails.inputs.environment.toLowerCase() === environmentName.toLowerCase()) {
-              isMatchingRun = true;
-            }
-          }
-
-          // Check for environment in other input fields (env, target_env, etc.)
-          if (!isMatchingRun && runDetails.inputs) {
-            const inputKeys = ['env', 'target_env', 'deploy_env', 'target_environment'];
-            for (const key of inputKeys) {
-              if (runDetails.inputs[key] && 
-                  runDetails.inputs[key].toLowerCase() === environmentName.toLowerCase()) {
-                isMatchingRun = true;
-                break;
-              }
-            }
-          }
-
-          // Check for environment in display title or name
-          if (!isMatchingRun) {
-            const titleMatch = runDetails.display_title?.toLowerCase().includes(environmentName.toLowerCase()) ||
-                              run.name.toLowerCase().includes(environmentName.toLowerCase());
-            if (titleMatch) {
-              isMatchingRun = true;
-            }
-          }
-
-          // Check for environment in run name patterns (e.g., "Deploy to prod", "dev deployment")
-          if (!isMatchingRun) {
-            const envPatterns = [
-              new RegExp(`\\b${environmentName}\\b`, 'i'),
-              new RegExp(`${environmentName}[-_]`, 'i'),
-              new RegExp(`[-_]${environmentName}\\b`, 'i'),
-              new RegExp(`deploy.*${environmentName}`, 'i'),
-              new RegExp(`${environmentName}.*deploy`, 'i'),
-            ];
-            
-            const textToCheck = `${run.name} ${runDetails.display_title || ''}`;
-            for (const pattern of envPatterns) {
-              if (pattern.test(textToCheck)) {
-                isMatchingRun = true;
-                break;
-              }
-            }
-          }
-
-          // Strategy 3: Check job-level filtering for environment
-          if (!isMatchingRun) {
-            const jobs = await this.getWorkflowRunJobs(owner, repo, run.id);
-            
-            // Exact job name match
-            const hasExactJobMatch = jobs.some(job => job.name === undefined);
-            if (hasExactJobMatch) {
-              isMatchingRun = true;
-            }
-
-            // Job name contains environment
-            if (!isMatchingRun) {
-              const hasEnvJobMatch = jobs.some(job => 
-                job.name.toLowerCase().includes(environmentName.toLowerCase())
-              );
-              if (hasEnvJobMatch) {
-                isMatchingRun = true;
-              }
-            }
-
-            // Job name contains both environment and job patterns
-            if (!isMatchingRun) {
-              const jobPatterns = [
-                new RegExp(`${environmentName}.*${undefined}`, 'i'),
-                new RegExp(`${undefined}.*${environmentName}`, 'i'),
-              ];
-              
-              const hasPatternMatch = jobs.some(job => 
-                jobPatterns.some(pattern => pattern.test(job.name))
-              );
-              if (hasPatternMatch) {
-                isMatchingRun = true;
-              }
-            }
-          }
-
-          // Check commit message and branch patterns
-          if (!isMatchingRun) {
-            // Branch name patterns
-            if (run.head_branch?.toLowerCase().includes(environmentName.toLowerCase())) {
-              isMatchingRun = true;
-            }
-          }
-        }
-
-        // Strategy 2: For separate workflow files, all runs are relevant
-        // This is handled by the workflow path filtering in the calling methods
-        // If no owner/repo provided, include all runs (backward compatibility)
-        if (!owner || !repo || isMatchingRun) {
-          filteredRuns.push(run);
-        }
-
-      } catch (error) {
-        // If we can't get run details, include the run to avoid breaking the UI
-        // This maintains backward compatibility and prevents filtering from breaking the system
-        filteredRuns.push(run);
-      }
-    }
-
-    return filteredRuns;
-  }
+  // private async filterRunsByEnvironment(
+  //   runs: GitHubWorkflowRun[],
+  //   environmentName: string,
+  //   owner?: string,
+  //   repo?: string,
+  //   workflowPath?: string,
+  // ): Promise<GitHubWorkflowRun[]> {
+  //   const filteredRuns: GitHubWorkflowRun[] = [];
+  //   
+  //   // Strategy 2: If workflow path is environment-specific, return all runs
+  //   if (workflowPath && this.isWorkflowPathEnvironmentSpecific(workflowPath, environmentName)) {
+  //     return runs;
+  //   }
+  //   
+  //   return filteredRuns;
+  // }
 
   async validatePermissions(owner: string, repo: string): Promise<boolean> {
     try {
@@ -879,30 +760,30 @@ export class GitHubApiService {
     return Date.now() - timestamp < this.CACHE_TTL;
   }
 
-  private mapWorkflowStatusToDeploymentStatus(
-    status: string,
-    conclusion: string | null,
-  ): DeploymentStatusType {
-    if (status === 'in_progress' || status === 'queued' || status === 'pending') {
-      return 'running';
-    }
-
-    if (status === 'completed') {
-      switch (conclusion) {
-        case 'success':
-          return 'success';
-        case 'failure':
-        case 'timed_out':
-          return 'failure';
-        case 'cancelled':
-          return 'cancelled';
-        default:
-          return 'failure';
-      }
-    }
-
-    return 'idle';
-  }
+  // private mapWorkflowStatusToDeploymentStatus(
+  //   status: string,
+  //   conclusion: string | null,
+  // ): DeploymentStatusType {
+  //   if (status === 'in_progress' || status === 'queued' || status === 'pending') {
+  //     return 'running';
+  //   }
+  //
+  //   if (status === 'completed') {
+  //     switch (conclusion) {
+  //       case 'success':
+  //         return 'success';
+  //       case 'failure':
+  //       case 'timed_out':
+  //         return 'failure';
+  //       case 'cancelled':
+  //         return 'cancelled';
+  //       default:
+  //         return 'failure';
+  //     }
+  //   }
+  //
+  //   return 'idle';
+  // }
 
   private mapDeploymentStateToDeploymentStatus(
     state: 'error' | 'failure' | 'inactive' | 'in_progress' | 'queued' | 'pending' | 'success'
@@ -924,13 +805,13 @@ export class GitHubApiService {
     }
   }
 
-  private parseVersionFromWorkflowRun(run: GitHubWorkflowRun): string {
-    // Try to extract version from head_sha (first 7 characters)
-    if (run.head_sha) {
-      return run.head_sha.substring(0, 7);
-    }
-    return 'unknown';
-  }
+  // private parseVersionFromWorkflowRun(run: GitHubWorkflowRun): string {
+  //   // Try to extract version from head_sha (first 7 characters)
+  //   if (run.head_sha) {
+  //     return run.head_sha.substring(0, 7);
+  //   }
+  //   return 'unknown';
+  // }
 
   private parseVersionFromDeployment(deployment: GitHubDeployment): string {
     // Try to extract version from payload first
@@ -956,7 +837,7 @@ export class GitHubApiService {
     environmentName: string,
     owner: string,
     repo: string,
-    workflowPath: string,
+    _workflowPath?: string,
   ): Promise<DeploymentStatus> {
     const cacheKey = this.getCacheKey(componentName, environmentName);
     const cached = this.statusCache.get(cacheKey);
@@ -1036,11 +917,15 @@ export class GitHubApiService {
           html_url: latestDeployment.creator.html_url,
           type: latestDeployment.creator.type,
         } : undefined,
-        errorMessage: deploymentStatus === 'failure' && finalStatus?.description 
-          ? finalStatus.description 
-          : deploymentStatus === 'failure' 
-            ? 'Deployment failed' 
-            : undefined,
+        errorMessage: (() => {
+          if (deploymentStatus === 'failure' && finalStatus?.description) {
+            return finalStatus.description;
+          }
+          if (deploymentStatus === 'failure') {
+            return 'Deployment failed';
+          }
+          return undefined;
+        })(),
       };
 
       this.statusCache.set(cacheKey, { data: status, timestamp: Date.now() });
@@ -1053,7 +938,7 @@ export class GitHubApiService {
     environmentName: string,
     owner: string,
     repo: string,
-    workflowPath: string,
+    _workflowPath?: string,
     limit: number = 20,
   ): Promise<DeploymentHistoryEntry[]> {
     const cacheKey = this.getCacheKey(componentName, environmentName);
@@ -1148,14 +1033,18 @@ export class GitHubApiService {
           status,
           startedAt,
           completedAt,
-          workflowRunId,
-          workflowRunUrl,
+          workflowRunId: workflowRunId || 0, // Provide fallback value
+          workflowRunUrl: workflowRunUrl || '', // Provide fallback value
           triggeredBy,
-          errorMessage: status === 'failure' && finalStatus?.description 
-            ? finalStatus.description 
-            : status === 'failure' 
-              ? 'Deployment failed' 
-              : undefined,
+          errorMessage: (() => {
+            if (status === 'failure' && finalStatus?.description) {
+              return finalStatus.description;
+            }
+            if (status === 'failure') {
+              return 'Deployment failed';
+            }
+            return undefined;
+          })(),
           duration,
         };
 

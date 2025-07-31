@@ -1,4 +1,4 @@
-import React from 'react';
+import { Component, ComponentType, ErrorInfo, FC, ReactNode, useState } from 'react';
 import {
   Box,
   Typography,
@@ -8,15 +8,13 @@ import {
   makeStyles,
   Theme,
 } from '@material-ui/core';
-import {
-  Error as ErrorIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon,
-  Settings as SettingsIcon,
-  Launch as LaunchIcon,
-} from '@material-ui/icons';
+import ErrorIcon from '@material-ui/icons/Error';
+import WarningIcon from '@material-ui/icons/Warning';
+import InfoIcon from '@material-ui/icons/Info';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
+import RefreshIcon from '@material-ui/icons/Refresh';
+import SettingsIcon from '@material-ui/icons/Settings';
+import LaunchIcon from '@material-ui/icons/Launch';
 import { Alert, AlertTitle } from '@material-ui/lab';
 import { GitHubApiError } from '../../services/GitHubApiService';
 import { getUserFriendlyErrorMessage } from '../../utils/errorMessages';
@@ -53,7 +51,7 @@ const useStyles = makeStyles((theme: Theme) => ({
   },
 }));
 
-export interface ErrorInfo {
+export interface ErrorInfoDetails {
   title?: string;
   message: string;
   code?: string;
@@ -64,7 +62,7 @@ export interface ErrorInfo {
 }
 
 interface ErrorDisplayProps {
-  error: Error | GitHubApiError | ErrorInfo | string;
+  error: Error | GitHubApiError | ErrorInfoDetails | string;
   onRetry?: () => void;
   showDetails?: boolean;
   severity?: 'error' | 'warning' | 'info';
@@ -73,7 +71,7 @@ interface ErrorDisplayProps {
 /**
  * Normalize different error types into a consistent ErrorInfo structure
  */
-function normalizeError(error: Error | GitHubApiError | ErrorInfo | string): ErrorInfo {
+function normalizeError(error: Error | GitHubApiError | ErrorInfoDetails | string): ErrorInfoDetails {
   if (typeof error === 'string') {
     const friendlyMessage = getUserFriendlyErrorMessage(error);
     return {
@@ -119,26 +117,6 @@ function normalizeError(error: Error | GitHubApiError | ErrorInfo | string): Err
 /**
  * Get appropriate error title based on error code
  */
-function getErrorTitle(code?: string): string {
-  switch (code) {
-    case 'AUTHENTICATION_FAILED':
-      return 'GitHub Authentication Required';
-    case 'RATE_LIMIT_EXCEEDED':
-      return 'GitHub API Rate Limit Exceeded';
-    case 'INSUFFICIENT_PERMISSIONS':
-      return 'Insufficient GitHub Permissions';
-    case 'RESOURCE_NOT_FOUND':
-      return 'GitHub Resource Not Found';
-    case 'GITHUB_API_ERROR':
-      return 'GitHub API Error';
-    case 'NETWORK_ERROR':
-      return 'Network Connection Error';
-    case 'VALIDATION_ERROR':
-      return 'Validation Error';
-    default:
-      return 'Error';
-  }
-}
 
 /**
  * Get appropriate icon based on error severity or code
@@ -180,7 +158,7 @@ function getErrorSeverity(code?: string): 'error' | 'warning' | 'info' {
 /**
  * Get appropriate action suggestions based on error code
  */
-function getErrorActions(errorInfo: ErrorInfo) {
+function getErrorActions(errorInfo: ErrorInfoDetails) {
   const actions = [];
   
   switch (errorInfo.code) {
@@ -258,7 +236,7 @@ function getErrorActions(errorInfo: ErrorInfo) {
     case 'VALIDATION_ERROR':
       if (errorInfo.details?.validationErrors?.length > 0) {
         actions.push({
-          text: `${errorInfo.details.validationErrors.length} validation errors`,
+          text: `${errorInfo.details?.validationErrors?.length} validation errors`,
           disabled: true,
         });
       }
@@ -273,19 +251,23 @@ function getErrorActions(errorInfo: ErrorInfo) {
         icon: <LaunchIcon />,
       });
       break;
+      
+    default:
+      // No additional actions for other error types
+      break;
   }
   
   return actions;
 }
 
-export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
+export const ErrorDisplay: FC<ErrorDisplayProps> = ({
   error,
   onRetry,
   showDetails = false,
   severity,
 }) => {
   const classes = useStyles();
-  const [expanded, setExpanded] = React.useState(false);
+  const [expanded, setExpanded] = useState(false);
   
   const errorInfo = normalizeError(error);
   const errorSeverity = severity || getErrorSeverity(errorInfo.code);
@@ -425,36 +407,24 @@ interface ErrorBoundaryState {
 }
 
 interface ErrorBoundaryProps {
-  children: React.ReactNode;
-  fallback?: React.ComponentType<{ error: Error; retry: () => void; retryCount: number }>;
-  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+  children: ReactNode;
+  fallback?: ComponentType<{ error: Error; retry: () => void; retryCount: number }>;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
   maxRetries?: number;
   resetOnPropsChange?: boolean;
   resetKeys?: any[];
 }
 
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+    return { hasError: true, error };
+  }
+  
   private resetTimeoutId: number | null = null;
   
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null, retryCount: 0 };
-  }
-  
-  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
-    return { hasError: true, error };
-  }
-  
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error caught by ErrorBoundary:', error, errorInfo);
-    this.props.onError?.(error, errorInfo);
-    
-    // Auto-retry for certain types of errors
-    if (this.shouldAutoRetry(error) && this.state.retryCount < (this.props.maxRetries || 3)) {
-      this.resetTimeoutId = window.setTimeout(() => {
-        this.retry();
-      }, Math.min(1000 * Math.pow(2, this.state.retryCount), 10000)); // Exponential backoff, max 10s
-    }
   }
   
   componentDidUpdate(prevProps: ErrorBoundaryProps) {
@@ -475,6 +445,19 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   componentWillUnmount() {
     if (this.resetTimeoutId) {
       clearTimeout(this.resetTimeoutId);
+    }
+  }
+  
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // eslint-disable-next-line no-console
+    console.error('Error caught by ErrorBoundary:', error, errorInfo);
+    this.props.onError?.(error, errorInfo);
+    
+    // Auto-retry for certain types of errors
+    if (this.shouldAutoRetry(error) && this.state.retryCount < (this.props.maxRetries || 3)) {
+      this.resetTimeoutId = window.setTimeout(() => {
+        this.retry();
+      }, Math.min(1000 * Math.pow(2, this.state.retryCount), 10000)); // Exponential backoff, max 10s
     }
   }
   

@@ -352,6 +352,15 @@ describe('ApplicationGrouperService', () => {
 // Helper functions for creating mock data
 
 function createMockApplication(name: string, owner?: string): ComponentEntity {
+  const spec: any = {
+    type: 'service',
+    lifecycle: 'production',
+  };
+  
+  if (owner) {
+    spec.owner = owner;
+  }
+  
   return {
     apiVersion: 'backstage.io/v1alpha1',
     kind: 'Component',
@@ -359,11 +368,7 @@ function createMockApplication(name: string, owner?: string): ComponentEntity {
       name,
       namespace: 'default',
     },
-    spec: {
-      type: 'service',
-      lifecycle: 'production',
-      owner: owner || undefined,
-    },
+    spec,
   };
 }
 

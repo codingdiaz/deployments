@@ -39,8 +39,8 @@ export class DatabaseEnvironmentStorageService implements EnvironmentStorageServ
       environmentName: row.environment_name,
       githubRepo: row.github_repo,
       workflowPath: row.workflow_path || undefined,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
     };
   }
 
@@ -157,7 +157,7 @@ export class DatabaseEnvironmentStorageService implements EnvironmentStorageServ
       .count('* as count')
       .first();
 
-    return (count?.count as number) > 0;
+    return (count as any)?.count > 0;
   }
 
   /**

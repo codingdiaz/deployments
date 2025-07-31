@@ -3,7 +3,7 @@
  */
 
 import { ComponentEntity } from '@backstage/catalog-model';
-import { OwnershipResolverService, CatalogApi, IdentityApi } from './OwnershipResolverService';
+import { OwnershipResolverService, CatalogApi } from './OwnershipResolverService';
 import { BackstageUserIdentity, OwnershipConfig } from '../types/ownership';
 
 // Mock implementations
@@ -34,13 +34,6 @@ class MockCatalogApi implements CatalogApi {
   }
 }
 
-class MockIdentityApi implements IdentityApi {
-  constructor(private identity: BackstageUserIdentity) {}
-
-  async getBackstageIdentity(): Promise<BackstageUserIdentity> {
-    return this.identity;
-  }
-}
 
 // Test data factories
 const createUser = (name: string, groups: string[] = []): BackstageUserIdentity => ({
@@ -55,24 +48,31 @@ const createComponent = (
   name: string, 
   owner?: string, 
   githubProject?: string
-): ComponentEntity => ({
-  apiVersion: 'backstage.io/v1alpha1',
-  kind: 'Component',
-  metadata: {
-    name,
-    namespace: 'default',
-    annotations: githubProject ? {
-      'github.com/project-slug': githubProject
-    } : {},
-  },
-  spec: {
+): ComponentEntity => {
+  const spec: any = {
     type: 'service',
     lifecycle: 'production',
-    owner: owner || undefined,
-  },
-});
+  };
+  
+  if (owner) {
+    spec.owner = owner;
+  }
+  
+  return {
+    apiVersion: 'backstage.io/v1alpha1',
+    kind: 'Component',
+    metadata: {
+      name,
+      namespace: 'default',
+      annotations: githubProject ? {
+        'github.com/project-slug': githubProject
+      } : {},
+    },
+    spec,
+  };
+};
 
-const createGroup = (name: string, displayName?: string): ComponentEntity => ({
+const createGroup = (name: string, displayName?: string): any => ({
   apiVersion: 'backstage.io/v1alpha1',
   kind: 'Group',
   metadata: {
@@ -84,17 +84,15 @@ const createGroup = (name: string, displayName?: string): ComponentEntity => ({
     type: 'team',
     children: [],
   },
-} as ComponentEntity);
+});
 
 describe('OwnershipResolverService', () => {
   let catalogApi: MockCatalogApi;
-  let identityApi: MockIdentityApi;
   let service: OwnershipResolverService;
 
   beforeEach(() => {
     catalogApi = new MockCatalogApi();
-    identityApi = new MockIdentityApi(createUser('john.doe', ['platform-team', 'frontend-team']));
-    service = new OwnershipResolverService(catalogApi, identityApi);
+    service = new OwnershipResolverService(catalogApi);
   });
 
   describe('resolveUserOwnership', () => {
@@ -306,7 +304,7 @@ describe('OwnershipResolverService', () => {
 
     it('should respect cache TTL and refresh expired data', async () => {
       const config: OwnershipConfig = { cacheTtl: 100 }; // 100ms TTL
-      const shortCacheService = new OwnershipResolverService(catalogApi, identityApi, config);
+      const shortCacheService = new OwnershipResolverService(catalogApi, config);
       
       const user = createUser('john.doe');
       const applications = [createComponent('app1', 'user:default/john.doe')];
@@ -359,7 +357,7 @@ describe('OwnershipResolverService', () => {
     it('should enhance owner info with catalog data when available', async () => {
       // Create a fresh catalog API for this test
       const freshCatalogApi = new MockCatalogApi();
-      const freshService = new OwnershipResolverService(freshCatalogApi, identityApi);
+      const freshService = new OwnershipResolverService(freshCatalogApi);
       
       // Add a group entity to the catalog
       const groupEntity = createGroup('platform-team', 'Platform Team');
@@ -381,7 +379,7 @@ describe('OwnershipResolverService', () => {
       const errorCatalogApi = new MockCatalogApi();
       errorCatalogApi.getEntityByRef = jest.fn().mockRejectedValue(new Error('Catalog error'));
       
-      const errorService = new OwnershipResolverService(errorCatalogApi, identityApi);
+      const errorService = new OwnershipResolverService(errorCatalogApi);
       const user = createUser('john.doe');
       const applications = [createComponent('app1', 'group:default/platform-team')];
 
@@ -395,7 +393,7 @@ describe('OwnershipResolverService', () => {
 
   describe('configuration', () => {
     it('should use default configuration when none provided', () => {
-      const defaultService = new OwnershipResolverService(catalogApi, identityApi);
+      const defaultService = new OwnershipResolverService(catalogApi);
       
       // Test that service works with defaults (no direct way to test config values)
       expect(defaultService).toBeDefined();
@@ -408,7 +406,7 @@ describe('OwnershipResolverService', () => {
         defaultView: 'all',
       };
       
-      const customService = new OwnershipResolverService(catalogApi, identityApi, config);
+      const customService = new OwnershipResolverService(catalogApi, config);
       
       expect(customService).toBeDefined();
     });

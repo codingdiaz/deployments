@@ -6,8 +6,6 @@ import { ComponentEntity } from '@backstage/catalog-model';
 import {
   BackstageUserIdentity,
   OwnershipResolver,
-  OwnershipData,
-  OwnedApplications,
 } from '../types/ownership';
 
 /**

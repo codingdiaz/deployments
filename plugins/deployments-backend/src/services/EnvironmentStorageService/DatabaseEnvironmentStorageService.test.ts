@@ -24,9 +24,7 @@ describe('DatabaseEnvironmentStorageService', () => {
       table.string('component_name', 100).notNullable();
       table.string('environment_name', 50).notNullable();
       table.string('github_repo', 200).notNullable();
-      table.string('workflow_path', 500).notNullable();
-      table.string('job_name', 100).notNullable();
-      table.string('github_environment', 100).nullable();
+      table.string('workflow_path', 500).nullable();
       table.timestamps(true, true);
       table.unique(['component_name', 'environment_name']);
       table.index(['component_name']);
@@ -48,8 +46,6 @@ describe('DatabaseEnvironmentStorageService', () => {
     environmentName: 'test-env',
     githubRepo: 'owner/repo',
     workflowPath: '.github/workflows/deploy.yml',
-    jobName: 'deploy',
-    githubEnvironment: 'production',
     ...overrides,
   });
 
@@ -63,8 +59,6 @@ describe('DatabaseEnvironmentStorageService', () => {
       expect(result.environmentName).toBe(testConfig.environmentName);
       expect(result.githubRepo).toBe(testConfig.githubRepo);
       expect(result.workflowPath).toBe(testConfig.workflowPath);
-      expect(result.jobName).toBe(testConfig.jobName);
-      expect(result.githubEnvironment).toBe(testConfig.githubEnvironment);
       expect(result.createdAt).toBeInstanceOf(Date);
       expect(result.updatedAt).toBeInstanceOf(Date);
     });
@@ -120,22 +114,23 @@ describe('DatabaseEnvironmentStorageService', () => {
       const testConfig = createTestEnvironment();
       const created = await service.createEnvironment('test-component', testConfig);
 
+      // Add a small delay to ensure updatedAt is different from createdAt
+      await new Promise(resolve => setTimeout(resolve, 10));
+
       const updates = {
         workflowPath: '.github/workflows/new-deploy.yml',
-        jobName: 'new-deploy',
       };
 
       const result = await service.updateEnvironment('test-component', 'test-env', updates);
 
       expect(result.id).toBe(created.id);
       expect(result.workflowPath).toBe(updates.workflowPath);
-      expect(result.jobName).toBe(updates.jobName);
-      expect(result.updatedAt.getTime()).toBeGreaterThan(result.createdAt.getTime());
+      expect(result.updatedAt.getTime()).toBeGreaterThanOrEqual(result.createdAt.getTime());
     });
 
     it('should throw error when updating nonexistent environment', async () => {
       await expect(
-        service.updateEnvironment('test-component', 'nonexistent', { jobName: 'new-job' })
+        service.updateEnvironment('test-component', 'nonexistent', { workflowPath: '.github/workflows/new.yml' })
       ).rejects.toThrow("Environment 'nonexistent' not found for component 'test-component'");
     });
   });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { FC, FormEvent, useState, useEffect } from 'react';
 import {
   Button,
   TextField,
@@ -58,7 +58,7 @@ interface EnvironmentConfigFormProps {
 /**
  * Form component for creating and editing environment configurations
  */
-export const EnvironmentConfigForm: React.FC<EnvironmentConfigFormProps> = ({
+export const EnvironmentConfigForm: FC<EnvironmentConfigFormProps> = ({
   open,
   onClose,
   onSubmit,
@@ -145,7 +145,7 @@ export const EnvironmentConfigForm: React.FC<EnvironmentConfigFormProps> = ({
   };
 
 
-  const handleSubmit = async (event: React.FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
 
     if (!validateForm()) {
@@ -224,7 +224,7 @@ export const EnvironmentConfigForm: React.FC<EnvironmentConfigFormProps> = ({
             <Grid item xs={12}>
               {(!hasValidRepoInfo || (environmentsQuery.error || (environmentsQuery.data && environmentsQuery.data.length === 0))) && !environmentsQuery.loading ? (
                 // Fallback to text field when GitHub environments can't be loaded
-                <TextField
+                (<TextField
                   fullWidth
                   label="Environment Name"
                   value={formData.environmentName}
@@ -246,10 +246,10 @@ export const EnvironmentConfigForm: React.FC<EnvironmentConfigFormProps> = ({
                   disabled={isEditing || isSubmitting}
                   required
                   placeholder="e.g., staging, production"
-                />
+                />)
               ) : (
                 // Use dropdown when GitHub environments are available
-                <FormControl 
+                (<FormControl 
                   fullWidth 
                   error={Boolean(formErrors.environmentName)} 
                   disabled={isEditing || isSubmitting}
@@ -291,7 +291,7 @@ export const EnvironmentConfigForm: React.FC<EnvironmentConfigFormProps> = ({
                   <FormHelperText>
                     {formErrors.environmentName || 'Select an environment name from your GitHub repository'}
                   </FormHelperText>
-                </FormControl>
+                </FormControl>)
               )}
             </Grid>
 
@@ -336,21 +336,29 @@ export const EnvironmentConfigForm: React.FC<EnvironmentConfigFormProps> = ({
                     <MenuItem value="">
                       <Typography color="textSecondary">None selected</Typography>
                     </MenuItem>
-                    {workflowsQuery.loading ? (
-                      <MenuItem disabled>
-                        <CircularProgress size={16} /> Loading workflows...
-                      </MenuItem>
-                    ) : workflowsQuery.error ? (
-                      <MenuItem disabled>
-                        <Typography color="error">Failed to load workflows</Typography>
-                      </MenuItem>
-                    ) : (
-                      workflowsQuery.data?.map((workflow) => (
+                    {(() => {
+                      if (workflowsQuery.loading) {
+                        return (
+                          <MenuItem disabled>
+                            <CircularProgress size={16} /> Loading workflows...
+                          </MenuItem>
+                        );
+                      }
+                      
+                      if (workflowsQuery.error) {
+                        return (
+                          <MenuItem disabled>
+                            <Typography color="error">Failed to load workflows</Typography>
+                          </MenuItem>
+                        );
+                      }
+                      
+                      return workflowsQuery.data?.map((workflow) => (
                         <MenuItem key={workflow} value={workflow}>
                           {workflow}
                         </MenuItem>
-                      ))
-                    )}
+                      ));
+                    })()}
                   </Select>
                   <FormHelperText>
                     {formErrors.workflowPath || 'Select a GitHub Actions workflow file (required for deployment triggers)'}

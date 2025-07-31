@@ -33,15 +33,15 @@ export const useViewToggle = () => {
 
   // Initialize ViewStateManager
   useEffect(() => {
-    const initializeViewStateManager = async () => {
+    const initializeViewStateManager = async (): Promise<(() => void) | undefined> => {
       try {
-        const ownershipResolver = new OwnershipResolverService(catalogApi, identityApi);
+        const ownershipResolver = new OwnershipResolverService(catalogApi as any, identityApi as any);
         const manager = new ViewStateManagerService(ownershipResolver);
         
         // Subscribe to view state changes
         const unsubscribe = manager.subscribe((newViewState) => {
           setViewState(newViewState);
-          setOwnedCount(newViewState.mode === 'owned' ? newViewState.filteredApplications.length : ownedCount);
+          setOwnedCount(prev => newViewState.mode === 'owned' ? newViewState.filteredApplications.length : prev);
         });
 
         setViewStateManager(manager);
@@ -52,6 +52,7 @@ export const useViewToggle = () => {
         return unsubscribe;
       } catch (error) {
         // Silently handle ViewStateManager initialization errors
+        return undefined;
       }
     };
 

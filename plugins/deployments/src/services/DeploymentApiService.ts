@@ -196,7 +196,6 @@ export class DeploymentApiService {
         owner,
         repo,
         environment.workflowPath,
-        environment.jobName,
       );
     } catch (error) {
       // If environment doesn't exist or GitHub API fails, return idle status
@@ -238,7 +237,6 @@ export class DeploymentApiService {
         owner,
         repo,
         environment.workflowPath,
-        environment.jobName,
         limit,
       );
     } catch (error) {

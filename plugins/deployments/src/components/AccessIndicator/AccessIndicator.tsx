@@ -1,4 +1,4 @@
-import React from 'react';
+import { FC } from 'react';
 import {
   Box,
   Tooltip,
@@ -103,7 +103,7 @@ export interface AccessIndicatorProps {
   className?: string;
 }
 
-export const AccessIndicator: React.FC<AccessIndicatorProps> = ({
+export const AccessIndicator: FC<AccessIndicatorProps> = ({
   accessLevel,
   ownerInfo,
   isOwned,

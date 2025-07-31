@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { 
   Typography, 
   Box,
@@ -14,7 +14,6 @@ import {
   EmptyState,
 } from '@backstage/core-components';
 import { ErrorDisplay, ErrorBoundary } from '../ErrorHandling';
-import { ApplicationCardSkeleton } from '../LoadingSkeletons';
 import { ViewToggle } from '../ViewToggle';
 import { ApplicationGroupComponent } from '../ApplicationGroup';
 import { 
@@ -107,7 +106,7 @@ export const ApplicationsListPage = () => {
 
   // Services (initialized once)
   const [services] = useState(() => {
-    const ownershipResolver = new OwnershipResolverService(catalogApi, identityApi);
+    const ownershipResolver = new OwnershipResolverService(catalogApi as any);
     const applicationGrouper = new ApplicationGrouperService();
     const viewStateManager = new ViewStateManagerService(ownershipResolver);
     
@@ -388,8 +387,8 @@ export const ApplicationsListPage = () => {
                   group={group}
                   currentView={state.currentView}
                   currentUserRef={state.user?.userEntityRef}
-                  showAccessIndicators={true}
-                  defaultExpanded={true}
+                  showAccessIndicators
+                  defaultExpanded
                 />
               ))}
             </Box>

@@ -1,24 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Typography, Grid, Button, Box } from '@material-ui/core';
-import { Add as AddIcon } from '@material-ui/icons';
+import AddIcon from '@material-ui/icons/Add';
 import { Link } from '@backstage/core-components';
 import {
-  InfoCard,
   Header,
   Page,
   Content,
-  ContentHeader,
   SupportButton,
 } from '@backstage/core-components';
 import { useRouteRef, useApi } from '@backstage/core-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { rootRouteRef } from '../../routes';
-import { useGitHubWorkflows } from '../../hooks/useGitHubApi';
 import { useEnvironments } from '../../hooks/useDeploymentApi';
 import { useAsync } from 'react-use';
 import { ErrorDisplay, ErrorBoundary } from '../ErrorHandling';
-import { EnvironmentCardSkeleton, WorkflowListSkeleton } from '../LoadingSkeletons';
+import { EnvironmentCardSkeleton } from '../LoadingSkeletons';
 import { EnvironmentConfigForm } from '../EnvironmentConfigForm';
 import { EnvironmentCardWithStatus } from '../EnvironmentCard';
 import { GitHubRepoLink } from '../GitHubRepoLink';
@@ -122,6 +119,7 @@ export const ApplicationDeploymentPage = () => {
   };
 
   const handleDeleteEnvironment = async (environmentName: string) => {
+    // eslint-disable-next-line no-alert
     if (window.confirm(`Are you sure you want to delete the "${environmentName}" environment?`)) {
       try {
         await deleteEnvironment(environmentName);
@@ -182,47 +180,57 @@ export const ApplicationDeploymentPage = () => {
           )}
           
           <Grid item>
-            {environmentsLoading ? (
-              <Grid container spacing={3}>
-                {Array.from({ length: 3 }).map((_, index) => (
-                  <Grid item xs={12} md={6} lg={4} key={index}>
-                    <EnvironmentCardSkeleton />
+            {(() => {
+              if (environmentsLoading) {
+                return (
+                  <Grid container spacing={3}>
+                    {Array.from({ length: 3 }).map((_, index) => (
+                      <Grid item xs={12} md={6} lg={4} key={index}>
+                        <EnvironmentCardSkeleton />
+                      </Grid>
+                    ))}
                   </Grid>
-                ))}
-              </Grid>
-            ) : environments.length === 0 ? (
-              <Box textAlign="center" style={{ padding: 24 }}>
-                <Typography variant="body1" gutterBottom>
-                  No deployment environments configured
-                </Typography>
-                <Typography variant="body2" color="textSecondary" gutterBottom>
-                  Configure your first deployment environment to start managing deployments for {componentName}.
-                  Each environment represents a deployment target (e.g., staging, production).
-                </Typography>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  startIcon={<AddIcon />}
-                  onClick={handleCreateEnvironment}
-                  style={{ marginTop: 16 }}
-                >
-                  Add Environment
-                </Button>
-              </Box>
-            ) : (
-              <Grid container spacing={3}>
-                {environments.map((env) => (
-                  <Grid item xs={12} md={6} lg={4} key={env.id}>
-                    <EnvironmentCardWithStatus
-                      environment={env}
-                      componentName={componentName || ''}
-                      onEdit={handleEditEnvironment}
-                      onDelete={handleDeleteEnvironment}
-                    />
-                  </Grid>
-                ))}
-              </Grid>
-            )}
+                );
+              }
+              
+              if (environments.length === 0) {
+                return (
+                  <Box textAlign="center" style={{ padding: 24 }}>
+                    <Typography variant="body1" gutterBottom>
+                      No deployment environments configured
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                      Configure your first deployment environment to start managing deployments for {componentName}.
+                      Each environment represents a deployment target (e.g., staging, production).
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<AddIcon />}
+                      onClick={handleCreateEnvironment}
+                      style={{ marginTop: 16 }}
+                    >
+                      Add Environment
+                    </Button>
+                  </Box>
+                );
+              }
+              
+              return (
+                <Grid container spacing={3}>
+                  {environments.map((env) => (
+                    <Grid item xs={12} md={6} lg={4} key={env.id}>
+                      <EnvironmentCardWithStatus
+                        environment={env}
+                        componentName={componentName || ''}
+                        onEdit={handleEditEnvironment}
+                        onDelete={handleDeleteEnvironment}
+                      />
+                    </Grid>
+                  ))}
+                </Grid>
+              );
+            })()}
           </Grid>
           
         </Grid>

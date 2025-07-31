@@ -3,7 +3,6 @@
  */
 
 import { ApplicationGrouperService, ApplicationGroup, OwnerInfo } from './index';
-import { ComponentEntity } from '@backstage/catalog-model';
 
 describe('Integration Tests', () => {
   it('should be able to import and use ApplicationGrouperService', () => {

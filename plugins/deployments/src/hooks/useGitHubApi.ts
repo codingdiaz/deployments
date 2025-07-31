@@ -41,7 +41,8 @@ export function useGitHubApiCall<T>(
     } finally {
       setLoading(false);
     }
-  }, [service, ...dependencies]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiCall, service, ...dependencies]);
 
   useEffect(() => {
     executeCall();
