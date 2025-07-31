@@ -1,6 +1,6 @@
-import { useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { EnvironmentCard } from './EnvironmentCard';
-import { useDeploymentStatus } from '../../hooks/useDeploymentApi';
+import { useDeploymentStatus } from '../../hooks/useGitHubApi';
 import { useRetry } from '../../hooks/useRetry';
 import { ErrorBoundary } from '../ErrorHandling';
 import { EnvironmentConfig } from '@internal/plugin-deployments-common';
@@ -25,29 +25,33 @@ export const EnvironmentCardWithStatus: React.FC<EnvironmentCardWithStatusProps>
   onEdit,
   onDelete,
 }) => {
-  const {
-    status,
-    loading,
-    error,
-    loadStatus,
-  } = useDeploymentStatus(componentName, environment.environmentName);
+  // Parse GitHub repo info
+  const repoInfo = environment.githubRepo
+    ? {
+        owner: environment.githubRepo.split('/')[0],
+        repo: environment.githubRepo.split('/')[1],
+      }
+    : null;
+
+  const statusQuery = useDeploymentStatus(
+    componentName,
+    environment.environmentName,
+    repoInfo?.owner || '',
+    repoInfo?.repo || '',
+    environment.workflowPath || '',
+  );
 
   // Enhanced retry with exponential backoff
   const retryWithBackoff = useRetry(
     useCallback(async () => {
-      await loadStatus();
-    }, [loadStatus]),
+      statusQuery.retry();
+    }, [statusQuery]),
     {
       maxRetries: 3,
       initialDelay: 1000,
       maxDelay: 10000,
     }
   );
-
-  // Load deployment status when component mounts or dependencies change
-  useEffect(() => {
-    loadStatus();
-  }, [loadStatus]);
 
   const handleRetry = useCallback(async () => {
     try {
@@ -65,9 +69,9 @@ export const EnvironmentCardWithStatus: React.FC<EnvironmentCardWithStatusProps>
     >
       <EnvironmentCard
         environment={environment}
-        deploymentStatus={status || undefined}
-        loading={loading || retryWithBackoff.isRetrying}
-        error={error || undefined}
+        deploymentStatus={statusQuery.data || undefined}
+        loading={statusQuery.loading || retryWithBackoff.isRetrying}
+        error={statusQuery.error?.message || undefined}
         componentName={componentName}
         onRetry={handleRetry}
         onEdit={onEdit}

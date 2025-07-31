@@ -28,7 +28,7 @@ export function useGitHubApiCall<T>(
   const executeCall = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await apiCall(service);
       setData(result);
@@ -57,7 +57,7 @@ export function useGitHubApiCall<T>(
 
 export function useGitHubWorkflows(owner: string, repo: string) {
   return useGitHubApiCall(
-    (service) => service.listWorkflows(owner, repo),
+    service => service.listWorkflows(owner, repo),
     [owner, repo],
   );
 }
@@ -69,12 +69,16 @@ export function useGitHubWorkflowRuns(
   perPage: number = 50,
 ) {
   return useGitHubApiCall(
-    (service) => service.listWorkflowRuns(owner, repo, workflowId, perPage),
+    service => service.listWorkflowRuns(owner, repo, workflowId, perPage),
     [owner, repo, workflowId, perPage],
   );
 }
 
-export function useGitHubTags(owner: string, repo: string, perPage: number = 50) {
+export function useGitHubTags(
+  owner: string,
+  repo: string,
+  perPage: number = 50,
+) {
   const service = useGitHubApi();
   const [data, setData] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -92,7 +96,7 @@ export function useGitHubTags(owner: string, repo: string, perPage: number = 50)
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await service.listTags(owner, repo, perPage);
       setData(result);
@@ -118,7 +122,11 @@ export function useGitHubTags(owner: string, repo: string, perPage: number = 50)
   return { data, loading, error, retry };
 }
 
-export function useGitHubBranches(owner: string, repo: string, perPage: number = 50) {
+export function useGitHubBranches(
+  owner: string,
+  repo: string,
+  perPage: number = 50,
+) {
   const service = useGitHubApi();
   const [data, setData] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -136,7 +144,7 @@ export function useGitHubBranches(owner: string, repo: string, perPage: number =
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await service.listBranches(owner, repo, perPage);
       setData(result);
@@ -169,7 +177,7 @@ export function useGitHubCommits(
   perPage: number = 50,
 ) {
   return useGitHubApiCall(
-    (service) => service.listCommits(owner, repo, sha, perPage),
+    service => service.listCommits(owner, repo, sha, perPage),
     [owner, repo, sha, perPage],
   );
 }
@@ -187,7 +195,7 @@ export function useDeploymentStatus(
   const [error, setError] = useState<GitHubApiError | null>(null);
 
   const hasRequiredParams = Boolean(
-    componentName && environmentName && owner && repo && workflowPath
+    componentName && environmentName && owner && repo && workflowPath,
   );
 
   const executeCall = useCallback(async () => {
@@ -200,7 +208,7 @@ export function useDeploymentStatus(
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await service.getDeploymentStatus(
         componentName,
@@ -219,7 +227,15 @@ export function useDeploymentStatus(
     } finally {
       setLoading(false);
     }
-  }, [service, componentName, environmentName, owner, repo, workflowPath, hasRequiredParams]);
+  }, [
+    service,
+    componentName,
+    environmentName,
+    owner,
+    repo,
+    workflowPath,
+    hasRequiredParams,
+  ]);
 
   useEffect(() => {
     executeCall();
@@ -246,7 +262,7 @@ export function useDeploymentHistory(
   const [error, setError] = useState<GitHubApiError | null>(null);
 
   const hasRequiredParams = Boolean(
-    componentName && environmentName && owner && repo && workflowPath
+    componentName && environmentName && owner && repo && workflowPath,
   );
 
   const executeCall = useCallback(async () => {
@@ -259,10 +275,9 @@ export function useDeploymentHistory(
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await service.getDeploymentHistory(
-        componentName,
         environmentName,
         owner,
         repo,
@@ -279,7 +294,15 @@ export function useDeploymentHistory(
     } finally {
       setLoading(false);
     }
-  }, [service, componentName, environmentName, owner, repo, workflowPath, limit, hasRequiredParams]);
+  }, [
+    service,
+    environmentName,
+    owner,
+    repo,
+    workflowPath,
+    limit,
+    hasRequiredParams,
+  ]);
 
   useEffect(() => {
     executeCall();
@@ -297,31 +320,48 @@ export function useTriggerDeployment() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<GitHubApiError | null>(null);
 
-  const triggerDeployment = useCallback(async (
-    owner: string,
-    repo: string,
-    workflowPath: string,
-    environmentName: string,
-    version: string,
-    componentName?: string,
-  ): Promise<{ workflowUrl: string; workflowRunUrl: string | null; workflowId: number } | null> => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const result = await service.triggerDeployment(owner, repo, workflowPath, environmentName, version, componentName);
-      return result;
-    } catch (err) {
-      if (err instanceof GitHubApiError) {
-        setError(err);
-      } else {
-        setError(new GitHubApiError('An unexpected error occurred while triggering deployment'));
+  const triggerDeployment = useCallback(
+    async (
+      owner: string,
+      repo: string,
+      workflowPath: string,
+      environmentName: string,
+      version: string,
+      _componentName?: string,
+    ): Promise<{
+      workflowUrl: string;
+      workflowRunUrl: string | null;
+      workflowId: number;
+    } | null> => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const result = await service.triggerDeployment(
+          owner,
+          repo,
+          workflowPath,
+          environmentName,
+          version,
+        );
+        return result;
+      } catch (err) {
+        if (err instanceof GitHubApiError) {
+          setError(err);
+        } else {
+          setError(
+            new GitHubApiError(
+              'An unexpected error occurred while triggering deployment',
+            ),
+          );
+        }
+        return null;
+      } finally {
+        setLoading(false);
       }
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [service]);
+    },
+    [service],
+  );
 
   return { triggerDeployment, loading, error };
 }
@@ -344,7 +384,7 @@ export function useGitHubEnvironments(owner: string, repo: string) {
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await service.listRepositoryEnvironments(owner, repo);
       setData(result);
@@ -388,7 +428,7 @@ export function useGitHubWorkflowFiles(owner: string, repo: string) {
 
     setLoading(true);
     setError(null);
-    
+
     try {
       const result = await service.listWorkflowFiles(owner, repo);
       setData(result);
@@ -419,51 +459,65 @@ export function useGitHubDeploymentApproval() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<GitHubApiError | null>(null);
 
-  const approveDeployment = useCallback(async (
-    owner: string,
-    repo: string,
-    deploymentId: number,
-    comment?: string,
-  ): Promise<void> => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      await service.approveDeployment(owner, repo, deploymentId, comment);
-    } catch (err) {
-      if (err instanceof GitHubApiError) {
-        setError(err);
-      } else {
-        setError(new GitHubApiError('An unexpected error occurred while approving deployment'));
-      }
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [service]);
+  const approveDeployment = useCallback(
+    async (
+      owner: string,
+      repo: string,
+      deploymentId: number,
+      comment?: string,
+    ): Promise<void> => {
+      setLoading(true);
+      setError(null);
 
-  const rejectDeployment = useCallback(async (
-    owner: string,
-    repo: string,
-    deploymentId: number,
-    comment?: string,
-  ): Promise<void> => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      await service.rejectDeployment(owner, repo, deploymentId, comment);
-    } catch (err) {
-      if (err instanceof GitHubApiError) {
-        setError(err);
-      } else {
-        setError(new GitHubApiError('An unexpected error occurred while rejecting deployment'));
+      try {
+        await service.approveDeployment(owner, repo, deploymentId, comment);
+      } catch (err) {
+        if (err instanceof GitHubApiError) {
+          setError(err);
+        } else {
+          setError(
+            new GitHubApiError(
+              'An unexpected error occurred while approving deployment',
+            ),
+          );
+        }
+        throw err;
+      } finally {
+        setLoading(false);
       }
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [service]);
+    },
+    [service],
+  );
+
+  const rejectDeployment = useCallback(
+    async (
+      owner: string,
+      repo: string,
+      deploymentId: number,
+      comment?: string,
+    ): Promise<void> => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        await service.rejectDeployment(owner, repo, deploymentId, comment);
+      } catch (err) {
+        if (err instanceof GitHubApiError) {
+          setError(err);
+        } else {
+          setError(
+            new GitHubApiError(
+              'An unexpected error occurred while rejecting deployment',
+            ),
+          );
+        }
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [service],
+  );
 
   return { approveDeployment, rejectDeployment, loading, error };
 }

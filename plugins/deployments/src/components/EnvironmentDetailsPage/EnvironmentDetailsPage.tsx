@@ -1,4 +1,4 @@
-import { FC, useEffect, useState, useCallback } from 'react';
+import { FC, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Typography,
@@ -43,7 +43,6 @@ import { useRouteRef } from '@backstage/core-plugin-api';
 import { applicationDeploymentRouteRef } from '../../routes';
 import {
   useEnvironments,
-  useDeploymentApi,
 } from '../../hooks/useDeploymentApi';
 import {
   useDeploymentHistory,
@@ -217,9 +216,6 @@ export const EnvironmentDetailsPage = () => {
     error: triggerError,
   } = useTriggerDeployment();
 
-  // Hook for deployment API (including approvals)
-  const deploymentApi = useDeploymentApi();
-
   // Hook for GitHub deployment approvals
   const {
     approveDeployment: approveGitHubDeployment,
@@ -249,39 +245,7 @@ export const EnvironmentDetailsPage = () => {
       }
     : null;
 
-  // Fetch deployment status (now includes approval info) and history
-  const [deploymentStatus, setDeploymentStatus] = useState<any>(null);
-  const [statusLoading, setStatusLoading] = useState(false);
-  const [statusError, setStatusError] = useState<Error | null>(null);
-
-  // Load deployment status with approval info
-  const loadDeploymentStatus = useCallback(async () => {
-    if (!componentName || !environmentName) return;
-
-    setStatusLoading(true);
-    setStatusError(null);
-
-    try {
-      const status = await deploymentApi.getDeploymentStatus(
-        componentName,
-        environmentName,
-      );
-      setDeploymentStatus(status);
-    } catch (error) {
-      setStatusError(
-        error instanceof Error
-          ? error
-          : new Error('Failed to load deployment status'),
-      );
-    } finally {
-      setStatusLoading(false);
-    }
-  }, [componentName, environmentName, deploymentApi]);
-
-  // Load status when component mounts or params change
-  useEffect(() => {
-    loadDeploymentStatus();
-  }, [loadDeploymentStatus]);
+  // Use GitHub API directly for deployment status (includes approval info)
 
   const statusQuery = useDeploymentStatus(
     componentName || '',
@@ -339,9 +303,10 @@ export const EnvironmentDetailsPage = () => {
       comment,
     );
 
-    // Refresh status after approval
-    await loadDeploymentStatus();
-    statusQuery.retry();
+    // Refresh status after approval with a small delay to let GitHub systems update
+    setTimeout(() => {
+      statusQuery.retry();
+    }, 2000);
   };
 
   // Handle rejection
@@ -357,9 +322,10 @@ export const EnvironmentDetailsPage = () => {
       comment,
     );
 
-    // Refresh status after rejection
-    await loadDeploymentStatus();
-    statusQuery.retry();
+    // Refresh status after rejection with a small delay to let GitHub systems update
+    setTimeout(() => {
+      statusQuery.retry();
+    }, 2000);
   };
 
   if (!componentName || !environmentName) {
@@ -415,11 +381,11 @@ export const EnvironmentDetailsPage = () => {
             </Grid>
 
             {/* Pending Approval Card */}
-            {deploymentStatus?.status === 'waiting_approval' &&
-              deploymentStatus.pendingApproval && (
+            {statusQuery.data?.status === 'waiting_approval' &&
+              statusQuery.data.pendingApproval && (
                 <Grid item>
                   <ApprovalCard
-                    approval={deploymentStatus.pendingApproval}
+                    approval={statusQuery.data.pendingApproval}
                     onApprove={handleApproval}
                     onReject={handleRejection}
                   />
@@ -430,49 +396,49 @@ export const EnvironmentDetailsPage = () => {
             <Grid item>
               <InfoCard title="Current Status">
                 {(() => {
-                  if (statusLoading) {
+                  if (statusQuery.loading) {
                     return <DeploymentStatusSkeleton />;
                   }
 
-                  if (statusError) {
+                  if (statusQuery.error) {
                     return (
                       <ErrorDisplay
-                        error={statusError}
-                        onRetry={loadDeploymentStatus}
+                        error={statusQuery.error}
+                        onRetry={statusQuery.retry}
                         severity="warning"
                         showDetails
                       />
                     );
                   }
 
-                  if (deploymentStatus) {
+                  if (statusQuery.data) {
                     return (
                       <Grid container spacing={2} alignItems="center">
                         <Grid item>
-                          <StatusChip status={deploymentStatus.status} />
+                          <StatusChip status={statusQuery.data.status} />
                         </Grid>
-                        {deploymentStatus.currentVersion && (
+                        {statusQuery.data.currentVersion && (
                           <Grid item>
                             <Typography
                               variant="body2"
                               className={classes.versionCell}
                             >
-                              Version: {deploymentStatus.currentVersion}
+                              Version: {statusQuery.data.currentVersion}
                             </Typography>
                           </Grid>
                         )}
-                        {deploymentStatus.deployedAt && (
+                        {statusQuery.data.deployedAt && (
                           <Grid item>
                             <Typography variant="body2" color="textSecondary">
                               Deployed:{' '}
-                              {formatDate(deploymentStatus.deployedAt)}
+                              {formatDate(statusQuery.data.deployedAt)}
                             </Typography>
                           </Grid>
                         )}
-                        {deploymentStatus.workflowRunUrl && (
+                        {statusQuery.data.workflowRunUrl && (
                           <Grid item>
                             <Button
-                              href={deploymentStatus.workflowRunUrl}
+                              href={statusQuery.data.workflowRunUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               size="small"
@@ -486,10 +452,10 @@ export const EnvironmentDetailsPage = () => {
                             </Button>
                           </Grid>
                         )}
-                        {deploymentStatus.errorMessage && (
+                        {statusQuery.data.errorMessage && (
                           <Grid item xs={12}>
                             <Typography variant="body2" color="error">
-                              Error: {deploymentStatus.errorMessage}
+                              Error: {statusQuery.data.errorMessage}
                             </Typography>
                           </Grid>
                         )}

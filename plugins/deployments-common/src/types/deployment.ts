@@ -125,6 +125,8 @@ export interface PendingApproval {
   deploymentUrl: string;
   /** Approval timeout (if configured) */
   timeoutMinutes?: number;
+  /** Timestamp when wait timer was started (if configured) */
+  waitTimerStartedAt?: Date;
 }
 
 /**

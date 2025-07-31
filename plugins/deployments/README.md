@@ -1,6 +1,6 @@
 # Backstage Deployment Plugin
 
-The Backstage Deployment Plugin provides a unified interface for managing deployments across GitHub Actions workflows. It allows teams to configure, monitor, and manage deployments directly from their Backstage developer portal.
+The Backstage Deployment Plugin provides a unified interface for managing deployments across GitHub Actions workflows. It allows teams to configure, monitor, and manage deployments directly from Backstage.
 
 ## Features
 
@@ -15,17 +15,8 @@ The Backstage Deployment Plugin provides a unified interface for managing deploy
 
 Before installing the Deployment Plugin, ensure you have:
 
-1. **Backstage v1.41.0+** with the new backend system
-2. **GitHub Integration** configured in your Backstage instance
-3. **GitHub OAuth** set up for user authentication
-4. **GitHub Personal Access Token** with appropriate permissions
-
-### GitHub Token Permissions
-
-Your GitHub token needs the following scopes:
-- `repo` - For accessing private repositories
-- `workflow` - For triggering workflow_dispatch events
-- `read:org` - For reading organization information (if using organization repositories)
+1. **Backstage > v1.41.0+** with the new backend system
+2. **GitHub OAuth** set up for user authentication
 
 ## Installation
 
@@ -39,9 +30,6 @@ yarn --cwd packages/app add @internal/plugin-deployments
 
 # Install backend plugin
 yarn --cwd packages/backend add @internal/plugin-deployments-backend
-
-# Install common types (if not automatically installed)
-yarn add @internal/plugin-deployments-common
 ```
 
 ### 2. Add Frontend Plugin to Your App
@@ -52,7 +40,7 @@ In `packages/app/src/App.tsx`, add the plugin route:
 import { DeploymentsPage } from '@internal/plugin-deployments';
 
 // Add to your route definitions
-<Route path="/deployments" element={<DeploymentsPage />} />
+<Route path="/deployments" element={<DeploymentsPage />} />;
 ```
 
 ### 3. Add Backend Plugin
@@ -78,7 +66,7 @@ In `packages/app/src/components/Root/Root.tsx`, add a navigation item:
 import { DeploymentIcon } from '@internal/plugin-deployments';
 
 // Add to your sidebar
-<SidebarItem icon={DeploymentIcon} to="deployments" text="Deployments" />
+<SidebarItem icon={DeploymentIcon} to="deployments" text="Deployments" />;
 ```
 
 ### 5. Configure GitHub Integration
@@ -86,11 +74,6 @@ import { DeploymentIcon } from '@internal/plugin-deployments';
 Ensure your `app-config.yaml` includes GitHub integration:
 
 ```yaml
-integrations:
-  github:
-    - host: github.com
-      token: ${GITHUB_TOKEN}
-
 auth:
   providers:
     github:
@@ -98,6 +81,8 @@ auth:
         clientId: ${GITHUB_CLIENT_ID}
         clientSecret: ${GITHUB_CLIENT_SECRET}
 ```
+
+TODO: describe how to update scopes for GitHub OAuth.
 
 ## Getting Started
 
@@ -113,9 +98,9 @@ metadata:
   description: My awesome application
   annotations:
     # Required: Enable deployment management
-    backstage.io/deployment-enabled: "true"
+    backstage.io/deployment-enabled: 'true'
     # Optional: Specify GitHub repository
-    backstage.io/source-location: "url:https://github.com/myorg/my-application"
+    backstage.io/source-location: 'url:https://github.com/myorg/my-application'
 spec:
   type: service
   lifecycle: production
@@ -132,6 +117,7 @@ spec:
 
 1. Click "Add Environment" on your application's deployment page
 2. Fill in the environment details:
+
    - **Environment Name**: e.g., "staging", "production"
    - **GitHub Repository**: Format: "owner/repository-name"
    - **Workflow Path**: Path to your GitHub Actions workflow file (e.g., ".github/workflows/deploy.yml")
@@ -143,6 +129,7 @@ spec:
 ### 4. Monitor Deployments
 
 Once configured, you can:
+
 - View real-time deployment status on environment cards
 - Click "View Details" to see deployment history
 - Access GitHub workflow runs directly from the interface
@@ -173,6 +160,7 @@ The plugin displays deployment status with visual indicators:
 ### Viewing Deployment History
 
 The deployment history page shows:
+
 - **Version**: The version/commit that was deployed
 - **Status**: Visual status indicator
 - **Started/Completed**: Timestamps for deployment timing
@@ -185,24 +173,29 @@ The deployment history page shows:
 ### Common Issues
 
 #### "No applications found"
+
 - Ensure your components have the `backstage.io/deployment-enabled: "true"` annotation
 - Check that your catalog is properly ingesting your `catalog-info.yaml` files
 
 #### "GitHub authentication failed"
+
 - Verify your GitHub token has the required permissions
 - Check that GitHub OAuth is properly configured in your `app-config.yaml`
 - Try refreshing the page to re-authenticate
 
 #### "Workflow not found"
+
 - Verify the workflow path is correct (e.g., ".github/workflows/deploy.yml")
 - Ensure the workflow file exists in your repository
 - Check that your GitHub token has access to the repository
 
 #### "Rate limit exceeded"
+
 - GitHub API has rate limits. Wait for the reset time shown in the error
 - Consider using a GitHub App instead of a personal access token for higher rate limits
 
 #### "Insufficient permissions"
+
 - Ensure your GitHub token has `repo` and `workflow` scopes
 - Verify you have access to the specified repository
 - Check that the repository is not archived or deleted
@@ -221,11 +214,13 @@ If you encounter issues:
 ### Custom Workflow Integration
 
 The plugin works with any GitHub Actions workflow that:
+
 - Can be triggered manually (has `workflow_dispatch` trigger)
 - Accepts version/environment parameters
 - Reports status through standard GitHub Actions status
 
 Example workflow structure:
+
 ```yaml
 name: Deploy Application
 on:
@@ -250,6 +245,7 @@ jobs:
 ### Environment Protection Rules
 
 When using GitHub Environments with protection rules:
+
 1. Set the `githubEnvironment` field to match your GitHub environment name
 2. The plugin will respect approval requirements and show pending status
 3. Manual approvals can be handled directly in GitHub
@@ -257,6 +253,7 @@ When using GitHub Environments with protection rules:
 ### Multiple Repository Support
 
 You can configure environments that deploy from different repositories:
+
 - Each environment can specify its own `githubRepo`
 - Useful for microservices or multi-repo architectures
 - The plugin will track deployments across all configured repositories

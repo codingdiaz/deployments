@@ -17,6 +17,7 @@ import ErrorIcon from '@material-ui/icons/Error';
 import RunningIcon from '@material-ui/icons/Schedule';
 import CancelledIcon from '@material-ui/icons/Cancel';
 import IdleIcon from '@material-ui/icons/HelpOutline';
+import WaitingApprovalIcon from '@material-ui/icons/HourglassEmpty';
 import RefreshIcon from '@material-ui/icons/Refresh';
 import MoreIcon from '@material-ui/icons/MoreVert';
 import { SvgIcon } from '@material-ui/core';
@@ -80,6 +81,10 @@ const useStyles = makeStyles((theme) => ({
   idleChip: {
     backgroundColor: theme.palette.type === 'dark' ? theme.palette.grey[700] : theme.palette.grey[300],
     color: theme.palette.type === 'dark' ? theme.palette.grey[100] : theme.palette.getContrastText(theme.palette.grey[300]),
+  },
+  waitingApprovalChip: {
+    backgroundColor: theme.palette.warning.main,
+    color: theme.palette.warning.contrastText,
   },
   statusIcon: {
     marginRight: theme.spacing(0.5),
@@ -177,6 +182,12 @@ function getStatusDisplay(status: DeploymentStatusType, classes: ReturnType<type
         icon: <CancelledIcon className={classes.statusIcon} />,
         chipClass: classes.cancelledChip,
         label: 'Cancelled',
+      };
+    case 'waiting_approval':
+      return {
+        icon: <WaitingApprovalIcon className={classes.statusIcon} />,
+        chipClass: classes.waitingApprovalChip,
+        label: 'Waiting Approval',
       };
     case 'idle':
     default:
