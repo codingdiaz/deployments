@@ -82,7 +82,7 @@ auth:
         clientSecret: ${GITHUB_CLIENT_SECRET}
 ```
 
-TODO: describe how to update scopes for GitHub OAuth.
+TODO: describe how to update scopes for GitHub OAuth in `packages/app/src/apis.ts`
 
 ## Getting Started
 
@@ -100,6 +100,7 @@ metadata:
     # Required: Enable deployment management
     backstage.io/deployment-enabled: 'true'
     # Optional: Specify GitHub repository
+    # TODO: isn't this already going to come through, should just switch to github source annotation
     backstage.io/source-location: 'url:https://github.com/myorg/my-application'
 spec:
   type: service
@@ -119,10 +120,7 @@ spec:
 2. Fill in the environment details:
 
    - **Environment Name**: e.g., "staging", "production"
-   - **GitHub Repository**: Format: "owner/repository-name"
-   - **Workflow Path**: Path to your GitHub Actions workflow file (e.g., ".github/workflows/deploy.yml")
-   - **Job Name**: Specific job within the workflow to monitor
-   - **GitHub Environment** (Optional): For protection rules and approvals
+   - **Workflow Path (optional)**: Path to your GitHub Actions workflow file (e.g., ".github/workflows/deploy.yml")
 
 3. Click "Create Environment"
 
@@ -147,68 +145,6 @@ Each environment represents a deployment target with these properties:
 - **Job Name**: Specific job within the workflow to monitor (useful for workflows with multiple jobs)
 - **GitHub Environment**: Optional GitHub environment name for protection rules
 
-### Deployment Status Indicators
-
-The plugin displays deployment status with visual indicators:
-
-- 🟢 **Success**: Deployment completed successfully
-- 🔴 **Failed**: Deployment failed
-- 🟡 **Running**: Deployment currently in progress
-- ⚫ **Cancelled**: Deployment was cancelled
-- ⚪ **Idle**: No recent deployments
-
-### Viewing Deployment History
-
-The deployment history page shows:
-
-- **Version**: The version/commit that was deployed
-- **Status**: Visual status indicator
-- **Started/Completed**: Timestamps for deployment timing
-- **Duration**: How long the deployment took
-- **Triggered By**: Who initiated the deployment
-- **Actions**: Direct links to GitHub workflow runs
-
-## Troubleshooting
-
-### Common Issues
-
-#### "No applications found"
-
-- Ensure your components have the `backstage.io/deployment-enabled: "true"` annotation
-- Check that your catalog is properly ingesting your `catalog-info.yaml` files
-
-#### "GitHub authentication failed"
-
-- Verify your GitHub token has the required permissions
-- Check that GitHub OAuth is properly configured in your `app-config.yaml`
-- Try refreshing the page to re-authenticate
-
-#### "Workflow not found"
-
-- Verify the workflow path is correct (e.g., ".github/workflows/deploy.yml")
-- Ensure the workflow file exists in your repository
-- Check that your GitHub token has access to the repository
-
-#### "Rate limit exceeded"
-
-- GitHub API has rate limits. Wait for the reset time shown in the error
-- Consider using a GitHub App instead of a personal access token for higher rate limits
-
-#### "Insufficient permissions"
-
-- Ensure your GitHub token has `repo` and `workflow` scopes
-- Verify you have access to the specified repository
-- Check that the repository is not archived or deleted
-
-### Getting Help
-
-If you encounter issues:
-
-1. Check the browser console for detailed error messages
-2. Verify your GitHub token permissions and configuration
-3. Ensure your workflow files are properly formatted and accessible
-4. Check Backstage logs for backend-related issues
-
 ## Advanced Configuration
 
 ### Custom Workflow Integration
@@ -226,9 +162,6 @@ name: Deploy Application
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: 'Version to deploy'
-        required: true
       environment:
         description: 'Environment to deploy to'
         required: true
@@ -241,30 +174,3 @@ jobs:
     steps:
       # Your deployment steps here
 ```
-
-### Environment Protection Rules
-
-When using GitHub Environments with protection rules:
-
-1. Set the `githubEnvironment` field to match your GitHub environment name
-2. The plugin will respect approval requirements and show pending status
-3. Manual approvals can be handled directly in GitHub
-
-### Multiple Repository Support
-
-You can configure environments that deploy from different repositories:
-
-- Each environment can specify its own `githubRepo`
-- Useful for microservices or multi-repo architectures
-- The plugin will track deployments across all configured repositories
-
-## Security Considerations
-
-- **Token Security**: Never commit GitHub tokens to your repository
-- **Permissions**: Follow the principle of least privilege for GitHub tokens
-- **Environment Secrets**: Use GitHub environment secrets for production deployments
-- **Approval Workflows**: Enable protection rules for production environments
-
-## Support
-
-For issues and feature requests, please contact your Backstage administrator or check your organization's internal documentation for support channels.
