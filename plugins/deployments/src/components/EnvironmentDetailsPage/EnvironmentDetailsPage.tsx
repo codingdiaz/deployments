@@ -1,21 +1,21 @@
-import { FC, useEffect, useState } from 'react';
+import { FC, useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { 
-  Typography, 
-  Grid, 
-  Button, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
+import {
+  Typography,
+  Grid,
+  Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
   TableRow,
   Paper,
   Chip,
   Box,
   makeStyles,
   Theme,
-  SvgIcon
+  SvgIcon,
 } from '@material-ui/core';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import ErrorIcon from '@material-ui/icons/Error';
@@ -23,9 +23,13 @@ import ScheduleIcon from '@material-ui/icons/Schedule';
 import CancelIcon from '@material-ui/icons/Cancel';
 import LinkIcon from '@material-ui/icons/Link';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
+import HourglassEmptyIcon from '@material-ui/icons/HourglassEmpty';
 import { Link, EmptyState } from '@backstage/core-components';
 import { ErrorDisplay, ErrorBoundary } from '../ErrorHandling';
-import { DeploymentHistoryTableSkeleton, DeploymentStatusSkeleton } from '../LoadingSkeletons';
+import {
+  DeploymentHistoryTableSkeleton,
+  DeploymentStatusSkeleton,
+} from '../LoadingSkeletons';
 import { DeploymentTriggerForm } from '../DeploymentTriggerForm';
 import {
   InfoCard,
@@ -37,14 +41,26 @@ import {
 } from '@backstage/core-components';
 import { useRouteRef } from '@backstage/core-plugin-api';
 import { applicationDeploymentRouteRef } from '../../routes';
-import { useEnvironments } from '../../hooks/useDeploymentApi';
-import { useDeploymentHistory, useDeploymentStatus, useTriggerDeployment } from '../../hooks/useGitHubApi';
-import { DeploymentStatusType, DeploymentHistoryEntry } from '@internal/plugin-deployments-common';
+import {
+  useEnvironments,
+  useDeploymentApi,
+} from '../../hooks/useDeploymentApi';
+import {
+  useDeploymentHistory,
+  useDeploymentStatus,
+  useTriggerDeployment,
+  useGitHubDeploymentApproval,
+} from '../../hooks/useGitHubApi';
+import {
+  DeploymentStatusType,
+  DeploymentHistoryEntry,
+} from '@internal/plugin-deployments-common';
+import { ApprovalCard } from '../ApprovalCard';
 
 // GitHub icon component
 const GitHubIcon: FC<{ className?: string }> = ({ className }) => (
   <SvgIcon className={className} viewBox="0 0 24 24">
-    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
   </SvgIcon>
 );
 
@@ -75,6 +91,10 @@ const useStyles = makeStyles((theme: Theme) => ({
     backgroundColor: theme.palette.grey[300],
     color: theme.palette.getContrastText(theme.palette.grey[300]),
   },
+  statusWaitingApproval: {
+    backgroundColor: theme.palette.warning.main,
+    color: theme.palette.warning.contrastText,
+  },
   versionCell: {
     fontFamily: 'monospace',
     fontSize: '0.875rem',
@@ -102,17 +122,19 @@ const StatusIcon: FC<{ status: DeploymentStatusType }> = ({ status }) => {
       return <ScheduleIcon />;
     case 'cancelled':
       return <CancelIcon />;
+    case 'waiting_approval':
+      return <HourglassEmptyIcon />;
     default:
       return <ScheduleIcon />;
   }
 };
 
-const StatusChip: FC<{ status: DeploymentStatusType; className?: string }> = ({ 
-  status, 
-  className 
+const StatusChip: FC<{ status: DeploymentStatusType; className?: string }> = ({
+  status,
+  className,
 }) => {
   const classes = useStyles();
-  
+
   const getStatusClassName = () => {
     switch (status) {
       case 'success':
@@ -123,27 +145,40 @@ const StatusChip: FC<{ status: DeploymentStatusType; className?: string }> = ({
         return classes.statusRunning;
       case 'cancelled':
         return classes.statusCancelled;
+      case 'waiting_approval':
+        return classes.statusWaitingApproval;
       default:
         return classes.statusIdle;
+    }
+  };
+
+  const getStatusLabel = () => {
+    switch (status) {
+      case 'waiting_approval':
+        return 'Waiting Approval';
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
     }
   };
 
   return (
     <Chip
       icon={<StatusIcon status={status} />}
-      label={status.charAt(0).toUpperCase() + status.slice(1)}
+      label={getStatusLabel()}
       size="small"
-      className={`${classes.statusChip} ${getStatusClassName()} ${className || ''}`}
+      className={`${classes.statusChip} ${getStatusClassName()} ${
+        className || ''
+      }`}
     />
   );
 };
 
 const formatDuration = (duration?: number): string => {
   if (!duration) return 'Unknown';
-  
+
   const minutes = Math.floor(duration / (1000 * 60));
   const seconds = Math.floor((duration % (1000 * 60)) / 1000);
-  
+
   if (minutes > 0) {
     return `${minutes}m ${seconds}s`;
   }
@@ -163,18 +198,33 @@ const formatDate = (date: Date): string => {
 
 export const EnvironmentDetailsPage = () => {
   const classes = useStyles();
-  const { componentName, environmentName } = useParams<{ 
-    componentName: string; 
-    environmentName: string; 
+  const { componentName, environmentName } = useParams<{
+    componentName: string;
+    environmentName: string;
   }>();
   const applicationDeploymentRoute = useRouteRef(applicationDeploymentRouteRef);
-  
-  const { environments, loadEnvironments } = useEnvironments(componentName || '');
+
+  const { environments, loadEnvironments } = useEnvironments(
+    componentName || '',
+  );
   const [currentEnv, setCurrentEnv] = useState<any>(null);
   const [triggerFormOpen, setTriggerFormOpen] = useState(false);
 
   // Hook for triggering deployments
-  const { triggerDeployment, loading: triggerLoading, error: triggerError } = useTriggerDeployment();
+  const {
+    triggerDeployment,
+    loading: triggerLoading,
+    error: triggerError,
+  } = useTriggerDeployment();
+
+  // Hook for deployment API (including approvals)
+  const deploymentApi = useDeploymentApi();
+
+  // Hook for GitHub deployment approvals
+  const {
+    approveDeployment: approveGitHubDeployment,
+    rejectDeployment: rejectGitHubDeployment,
+  } = useGitHubDeploymentApproval();
 
   // Load environments to get the configuration for this specific environment
   useEffect(() => {
@@ -192,12 +242,47 @@ export const EnvironmentDetailsPage = () => {
   }, [environments, environmentName]);
 
   // Parse GitHub repo info
-  const repoInfo = currentEnv?.githubRepo ? {
-    owner: currentEnv.githubRepo.split('/')[0],
-    repo: currentEnv.githubRepo.split('/')[1],
-  } : null;
+  const repoInfo = currentEnv?.githubRepo
+    ? {
+        owner: currentEnv.githubRepo.split('/')[0],
+        repo: currentEnv.githubRepo.split('/')[1],
+      }
+    : null;
 
-  // Fetch deployment status and history only when we have all required params
+  // Fetch deployment status (now includes approval info) and history
+  const [deploymentStatus, setDeploymentStatus] = useState<any>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusError, setStatusError] = useState<Error | null>(null);
+
+  // Load deployment status with approval info
+  const loadDeploymentStatus = useCallback(async () => {
+    if (!componentName || !environmentName) return;
+
+    setStatusLoading(true);
+    setStatusError(null);
+
+    try {
+      const status = await deploymentApi.getDeploymentStatus(
+        componentName,
+        environmentName,
+      );
+      setDeploymentStatus(status);
+    } catch (error) {
+      setStatusError(
+        error instanceof Error
+          ? error
+          : new Error('Failed to load deployment status'),
+      );
+    } finally {
+      setStatusLoading(false);
+    }
+  }, [componentName, environmentName, deploymentApi]);
+
+  // Load status when component mounts or params change
+  useEffect(() => {
+    loadDeploymentStatus();
+  }, [loadDeploymentStatus]);
+
   const statusQuery = useDeploymentStatus(
     componentName || '',
     environmentName || '',
@@ -241,6 +326,42 @@ export const EnvironmentDetailsPage = () => {
     return result;
   };
 
+  // Handle approval
+  const handleApproval = async (deploymentId: number, comment?: string) => {
+    if (!repoInfo) {
+      throw new Error('Repository information not available');
+    }
+
+    await approveGitHubDeployment(
+      repoInfo.owner,
+      repoInfo.repo,
+      deploymentId,
+      comment,
+    );
+
+    // Refresh status after approval
+    await loadDeploymentStatus();
+    statusQuery.retry();
+  };
+
+  // Handle rejection
+  const handleRejection = async (deploymentId: number, comment?: string) => {
+    if (!repoInfo) {
+      throw new Error('Repository information not available');
+    }
+
+    await rejectGitHubDeployment(
+      repoInfo.owner,
+      repoInfo.repo,
+      deploymentId,
+      comment,
+    );
+
+    // Refresh status after rejection
+    await loadDeploymentStatus();
+    statusQuery.retry();
+  };
+
   if (!componentName || !environmentName) {
     return (
       <Page themeId="tool">
@@ -259,239 +380,294 @@ export const EnvironmentDetailsPage = () => {
   return (
     <ErrorBoundary>
       <Page themeId="tool">
-        <Header 
-          title={`${componentName} - ${environmentName}`} 
+        <Header
+          title={`${componentName} - ${environmentName}`}
           subtitle="Deployment history and details"
         />
         <Content>
-        <ContentHeader title="Environment Details">
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<PlayArrowIcon />}
-            onClick={() => setTriggerFormOpen(true)}
-            disabled={!currentEnv || !repoInfo || !currentEnv.workflowPath}
-          >
-            Trigger Deployment
-          </Button>
-          <SupportButton>
-            View deployment history and details for the {environmentName} environment.
-          </SupportButton>
-        </ContentHeader>
-        
-        <Grid container spacing={3} direction="column">
-          <Grid item>
-            <Link to={applicationDeploymentRoute({ componentName: componentName })}>
-              <Button variant="outlined" className={classes.backButton}>
-                ← Back to {componentName} Deployments
-              </Button>
-            </Link>
-          </Grid>
+          <ContentHeader title="Environment Details">
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<PlayArrowIcon />}
+              onClick={() => setTriggerFormOpen(true)}
+              disabled={!currentEnv || !repoInfo || !currentEnv.workflowPath}
+            >
+              Trigger Deployment
+            </Button>
+            <SupportButton>
+              View deployment history and details for the {environmentName}{' '}
+              environment.
+            </SupportButton>
+          </ContentHeader>
 
-          {/* Current Status Card */}
-          <Grid item>
-            <InfoCard title="Current Status">
-              {(() => {
-                if (statusQuery.loading) {
-                  return <DeploymentStatusSkeleton />;
-                }
-                
-                if (statusQuery.error) {
-                  return (
-                    <ErrorDisplay 
-                      error={statusQuery.error} 
-                      onRetry={statusQuery.retry}
-                      severity="warning"
-                      showDetails
-                    />
-                  );
-                }
-                
-                if (statusQuery.data) {
-                  return (
-                    <Grid container spacing={2} alignItems="center">
-                      <Grid item>
-                        <StatusChip status={statusQuery.data.status} />
+          <Grid container spacing={3} direction="column">
+            <Grid item>
+              <Link
+                to={applicationDeploymentRoute({
+                  componentName: componentName,
+                })}
+              >
+                <Button variant="outlined" className={classes.backButton}>
+                  ← Back to {componentName} Deployments
+                </Button>
+              </Link>
+            </Grid>
+
+            {/* Pending Approval Card */}
+            {deploymentStatus?.status === 'waiting_approval' &&
+              deploymentStatus.pendingApproval && (
+                <Grid item>
+                  <ApprovalCard
+                    approval={deploymentStatus.pendingApproval}
+                    onApprove={handleApproval}
+                    onReject={handleRejection}
+                  />
+                </Grid>
+              )}
+
+            {/* Current Status Card */}
+            <Grid item>
+              <InfoCard title="Current Status">
+                {(() => {
+                  if (statusLoading) {
+                    return <DeploymentStatusSkeleton />;
+                  }
+
+                  if (statusError) {
+                    return (
+                      <ErrorDisplay
+                        error={statusError}
+                        onRetry={loadDeploymentStatus}
+                        severity="warning"
+                        showDetails
+                      />
+                    );
+                  }
+
+                  if (deploymentStatus) {
+                    return (
+                      <Grid container spacing={2} alignItems="center">
+                        <Grid item>
+                          <StatusChip status={deploymentStatus.status} />
+                        </Grid>
+                        {deploymentStatus.currentVersion && (
+                          <Grid item>
+                            <Typography
+                              variant="body2"
+                              className={classes.versionCell}
+                            >
+                              Version: {deploymentStatus.currentVersion}
+                            </Typography>
+                          </Grid>
+                        )}
+                        {deploymentStatus.deployedAt && (
+                          <Grid item>
+                            <Typography variant="body2" color="textSecondary">
+                              Deployed:{' '}
+                              {formatDate(deploymentStatus.deployedAt)}
+                            </Typography>
+                          </Grid>
+                        )}
+                        {deploymentStatus.workflowRunUrl && (
+                          <Grid item>
+                            <Button
+                              href={deploymentStatus.workflowRunUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              size="small"
+                              variant="outlined"
+                              startIcon={<GitHubIcon />}
+                              endIcon={
+                                <LinkIcon className={classes.linkIcon} />
+                              }
+                            >
+                              View Workflow
+                            </Button>
+                          </Grid>
+                        )}
+                        {deploymentStatus.errorMessage && (
+                          <Grid item xs={12}>
+                            <Typography variant="body2" color="error">
+                              Error: {deploymentStatus.errorMessage}
+                            </Typography>
+                          </Grid>
+                        )}
                       </Grid>
-                      {statusQuery.data.currentVersion && (
-                        <Grid item>
-                          <Typography variant="body2" className={classes.versionCell}>
-                            Version: {statusQuery.data.currentVersion}
-                          </Typography>
-                        </Grid>
-                      )}
-                      {statusQuery.data.deployedAt && (
-                        <Grid item>
-                          <Typography variant="body2" color="textSecondary">
-                            Deployed: {formatDate(statusQuery.data.deployedAt)}
-                          </Typography>
-                        </Grid>
-                      )}
-                      {statusQuery.data.workflowRunUrl && (
-                        <Grid item>
-                          <Button
-                            href={statusQuery.data.workflowRunUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            size="small"
-                            variant="outlined"
-                            startIcon={<GitHubIcon />}
-                            endIcon={<LinkIcon className={classes.linkIcon} />}
-                          >
-                            View Workflow
-                          </Button>
-                        </Grid>
-                      )}
-                    </Grid>
-                  );
-                }
-                
-                return (
-                  <Typography variant="body1">
-                    No current status available.
-                  </Typography>
-                );
-              })()}
-            </InfoCard>
-          </Grid>
+                    );
+                  }
 
-          {/* Deployment History Card */}
-          <Grid item>
-            <InfoCard title="Deployment History">
-              {(() => {
-                if (historyQuery.loading) {
-                  return <DeploymentHistoryTableSkeleton />;
-                }
-                
-                if (historyQuery.error) {
                   return (
-                    <ErrorDisplay 
-                      error={historyQuery.error} 
-                      onRetry={historyQuery.retry}
-                      severity="warning"
-                      showDetails
-                    />
+                    <Typography variant="body1">
+                      No current status available.
+                    </Typography>
                   );
-                }
-                
-                if (historyQuery.data && historyQuery.data.length > 0) {
-                  return (
-                    <TableContainer component={Paper} variant="outlined">
-                      <Table size="small">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Status</TableCell>
-                            <TableCell>Version</TableCell>
-                            <TableCell>Started</TableCell>
-                            <TableCell>Duration</TableCell>
-                            <TableCell>Triggered By</TableCell>
-                            <TableCell>Actions</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {historyQuery.data.map((deployment: DeploymentHistoryEntry) => (
-                            <TableRow key={deployment.id}>
-                              <TableCell>
-                                <StatusChip status={deployment.status} />
-                              </TableCell>
-                              <TableCell className={classes.versionCell}>
-                                {deployment.version}
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="body2">
-                                  {formatDate(deployment.startedAt)}
-                                </Typography>
-                                {deployment.completedAt && (
-                                  <Typography variant="caption" className={classes.durationText}>
-                                    Completed: {formatDate(deployment.completedAt)}
-                                  </Typography>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Typography variant="body2">
-                                  {formatDuration(deployment.duration)}
-                                </Typography>
-                              </TableCell>
-                              <TableCell>
-                                <Box display="flex" alignItems="center" style={{ gap: '8px' }}>
-                                  {deployment.triggeredBy.avatar_url && (
-                                    <img 
-                                      src={deployment.triggeredBy.avatar_url}
-                                      alt={`${deployment.triggeredBy.login}'s avatar`}
-                                      style={{ width: 20, height: 20, borderRadius: '50%' }}
-                                    />
-                                  )}
-                                  <Typography variant="body2">
-                                    {deployment.triggeredBy.html_url ? (
-                                      <a
-                                        href={deployment.triggeredBy.html_url}
+                })()}
+              </InfoCard>
+            </Grid>
+
+            {/* Deployment History Card */}
+            <Grid item>
+              <InfoCard title="Deployment History">
+                {(() => {
+                  if (historyQuery.loading) {
+                    return <DeploymentHistoryTableSkeleton />;
+                  }
+
+                  if (historyQuery.error) {
+                    return (
+                      <ErrorDisplay
+                        error={historyQuery.error}
+                        onRetry={historyQuery.retry}
+                        severity="warning"
+                        showDetails
+                      />
+                    );
+                  }
+
+                  if (historyQuery.data && historyQuery.data.length > 0) {
+                    return (
+                      <TableContainer component={Paper} variant="outlined">
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Status</TableCell>
+                              <TableCell>Version</TableCell>
+                              <TableCell>Started</TableCell>
+                              <TableCell>Duration</TableCell>
+                              <TableCell>Triggered By</TableCell>
+                              <TableCell>Actions</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {historyQuery.data.map(
+                              (deployment: DeploymentHistoryEntry) => (
+                                <TableRow key={deployment.id}>
+                                  <TableCell>
+                                    <StatusChip status={deployment.status} />
+                                  </TableCell>
+                                  <TableCell className={classes.versionCell}>
+                                    {deployment.version}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2">
+                                      {formatDate(deployment.startedAt)}
+                                    </Typography>
+                                    {deployment.completedAt && (
+                                      <Typography
+                                        variant="caption"
+                                        className={classes.durationText}
+                                      >
+                                        Completed:{' '}
+                                        {formatDate(deployment.completedAt)}
+                                      </Typography>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2">
+                                      {formatDuration(deployment.duration)}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Box
+                                      display="flex"
+                                      alignItems="center"
+                                      style={{ gap: '8px' }}
+                                    >
+                                      {deployment.triggeredBy.avatar_url && (
+                                        <img
+                                          src={
+                                            deployment.triggeredBy.avatar_url
+                                          }
+                                          alt={`${deployment.triggeredBy.login}'s avatar`}
+                                          style={{
+                                            width: 20,
+                                            height: 20,
+                                            borderRadius: '50%',
+                                          }}
+                                        />
+                                      )}
+                                      <Typography variant="body2">
+                                        {deployment.triggeredBy.html_url ? (
+                                          <a
+                                            href={
+                                              deployment.triggeredBy.html_url
+                                            }
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                              textDecoration: 'none',
+                                              color: 'inherit',
+                                            }}
+                                          >
+                                            {deployment.triggeredBy.login}
+                                          </a>
+                                        ) : (
+                                          deployment.triggeredBy.login
+                                        )}
+                                      </Typography>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell>
+                                    {deployment.workflowRunUrl ? (
+                                      <Button
+                                        href={deployment.workflowRunUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        style={{ textDecoration: 'none', color: 'inherit' }}
+                                        size="small"
+                                        variant="outlined"
+                                        startIcon={<GitHubIcon />}
+                                        endIcon={
+                                          <LinkIcon
+                                            className={classes.linkIcon}
+                                          />
+                                        }
                                       >
-                                        {deployment.triggeredBy.login}
-                                      </a>
+                                        View
+                                      </Button>
                                     ) : (
-                                      deployment.triggeredBy.login
+                                      <Button
+                                        size="small"
+                                        variant="outlined"
+                                        disabled
+                                        title="Workflow run URL not available"
+                                      >
+                                        View
+                                      </Button>
                                     )}
-                                  </Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell>
-                                {deployment.workflowRunUrl ? (
-                                  <Button
-                                    href={deployment.workflowRunUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    size="small"
-                                    variant="outlined"
-                                    startIcon={<GitHubIcon />}
-                                    endIcon={<LinkIcon className={classes.linkIcon} />}
-                                  >
-                                    View
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    disabled
-                                    title="Workflow run URL not available"
-                                  >
-                                    View
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  );
-                }
-                
-                return (
-                  <Box className={classes.emptyStateContainer}>
-                    <EmptyState
-                      missing="data"
-                      title="No Deployment History"
-                      description={`No deployment history found for the ${environmentName} environment. Deployments will appear here once workflows are executed. If you've triggered a deployment recently, it may take a few moments to appear.`}
-                    />
-                  </Box>
-                );
-              })()}
-            </InfoCard>
-          </Grid>
-        </Grid>
+                                  </TableCell>
+                                </TableRow>
+                              ),
+                            )}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    );
+                  }
 
-        <DeploymentTriggerForm
-          open={triggerFormOpen}
-          environmentName={environmentName || ''}
-          loading={triggerLoading}
-          error={triggerError}
-          githubRepo={currentEnv?.githubRepo}
-          onClose={() => setTriggerFormOpen(false)}
-          onSubmit={handleTriggerDeployment}
-        />
+                  return (
+                    <Box className={classes.emptyStateContainer}>
+                      <EmptyState
+                        missing="data"
+                        title="No Deployment History"
+                        description={`No deployment history found for the ${environmentName} environment. Deployments will appear here once workflows are executed. If you've triggered a deployment recently, it may take a few moments to appear.`}
+                      />
+                    </Box>
+                  );
+                })()}
+              </InfoCard>
+            </Grid>
+          </Grid>
+
+          <DeploymentTriggerForm
+            open={triggerFormOpen}
+            environmentName={environmentName || ''}
+            loading={triggerLoading}
+            error={triggerError}
+            githubRepo={currentEnv?.githubRepo}
+            onClose={() => setTriggerFormOpen(false)}
+            onSubmit={handleTriggerDeployment}
+          />
         </Content>
       </Page>
     </ErrorBoundary>

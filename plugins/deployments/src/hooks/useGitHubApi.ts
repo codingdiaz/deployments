@@ -413,3 +413,57 @@ export function useGitHubWorkflowFiles(owner: string, repo: string) {
 
   return { data, loading, error, retry };
 }
+
+export function useGitHubDeploymentApproval() {
+  const service = useGitHubApi();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<GitHubApiError | null>(null);
+
+  const approveDeployment = useCallback(async (
+    owner: string,
+    repo: string,
+    deploymentId: number,
+    comment?: string,
+  ): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await service.approveDeployment(owner, repo, deploymentId, comment);
+    } catch (err) {
+      if (err instanceof GitHubApiError) {
+        setError(err);
+      } else {
+        setError(new GitHubApiError('An unexpected error occurred while approving deployment'));
+      }
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [service]);
+
+  const rejectDeployment = useCallback(async (
+    owner: string,
+    repo: string,
+    deploymentId: number,
+    comment?: string,
+  ): Promise<void> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      await service.rejectDeployment(owner, repo, deploymentId, comment);
+    } catch (err) {
+      if (err instanceof GitHubApiError) {
+        setError(err);
+      } else {
+        setError(new GitHubApiError('An unexpected error occurred while rejecting deployment'));
+      }
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [service]);
+
+  return { approveDeployment, rejectDeployment, loading, error };
+}

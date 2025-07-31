@@ -7,6 +7,9 @@ import {
   EnvironmentConfigListResponse,
   DeploymentStatus,
   DeploymentHistoryEntry,
+  // ApproveDeploymentRequest,
+  // ApproveDeploymentResponse,
+  DeploymentStatusResponse,
 } from '@internal/plugin-deployments-common';
 import { GitHubApiService } from './GitHubApiService';
 
@@ -180,25 +183,23 @@ export class DeploymentApiService {
   }
 
   /**
-   * Get deployment status for a specific environment
+   * Get deployment status for a specific environment (with approval support)
    */
   async getDeploymentStatus(componentName: string, environmentName: string): Promise<DeploymentStatus> {
     try {
-      // First, get the environment configuration
-      const environment = await this.getEnvironment(componentName, environmentName);
-      const { owner, repo } = this.parseGitHubRepo(environment.githubRepo);
-      
-      // Use GitHub API service to get deployment status
-      const gitHubService = this.getGitHubApiService();
-      return await gitHubService.getDeploymentStatus(
-        componentName,
-        environmentName,
-        owner,
-        repo,
-        environment.workflowPath,
+      const baseUrl = await this.getBaseUrl();
+      const response = await this.fetchApi.fetch(
+        `${baseUrl}/deployments/${encodeURIComponent(componentName)}/${encodeURIComponent(environmentName)}/status`
       );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch deployment status: ${response.statusText}`);
+      }
+      
+      const data: DeploymentStatusResponse = await response.json();
+      return data.status;
     } catch (error) {
-      // If environment doesn't exist or GitHub API fails, return idle status
+      // If environment doesn't exist or API fails, return idle status
       if (error instanceof Error && error.message.includes('not found')) {
         return {
           environmentName,
@@ -214,6 +215,45 @@ export class DeploymentApiService {
         errorMessage: error instanceof Error ? error.message : 'Failed to fetch deployment status',
       };
     }
+  }
+
+  /**
+   * Approve a pending deployment directly via GitHub API
+   */
+  // async approveDeployment(
+  //   deploymentId: number,
+  //   comment?: string
+  // ): Promise<void> {
+  //   // We'll need the repo info, but for now let's try to get it from the environment
+  //   // This is a simplified approach - in a real implementation you might want to 
+  //   // pass the owner/repo as parameters or store them in the deployment context
+  //   throw new Error('Direct GitHub approval not yet implemented - use approveGitHubDeployment instead');
+  // }
+
+  /**
+   * Approve a GitHub deployment directly
+   */
+  async approveGitHubDeployment(
+    owner: string,
+    repo: string,
+    deploymentId: number,
+    comment?: string
+  ): Promise<void> {
+    const gitHubService = this.getGitHubApiService();
+    await gitHubService.approveDeployment(owner, repo, deploymentId, comment);
+  }
+
+  /**
+   * Reject a GitHub deployment directly
+   */
+  async rejectGitHubDeployment(
+    owner: string,
+    repo: string,
+    deploymentId: number,
+    comment?: string
+  ): Promise<void> {
+    const gitHubService = this.getGitHubApiService();
+    await gitHubService.rejectDeployment(owner, repo, deploymentId, comment);
   }
 
   /**

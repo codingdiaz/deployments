@@ -158,6 +158,95 @@ export interface GitHubEnvironment {
 }
 
 /**
+ * GitHub deployment information
+ */
+export interface GitHubDeployment {
+  /** Deployment ID */
+  id: number;
+  /** SHA being deployed */
+  sha: string;
+  /** Reference (branch/tag) being deployed */
+  ref: string;
+  /** Environment name */
+  environment: string;
+  /** Deployment description */
+  description?: string;
+  /** User who created the deployment */
+  creator: {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+  };
+  /** Timestamp when deployment was created */
+  created_at: string;
+  /** Timestamp when deployment was updated */
+  updated_at: string;
+  /** Current deployment status */
+  statuses_url: string;
+  /** Repository URL */
+  repository_url: string;
+}
+
+/**
+ * GitHub deployment status information
+ */
+export interface GitHubDeploymentStatus {
+  /** Status ID */
+  id: number;
+  /** Deployment state */
+  state: 'error' | 'failure' | 'inactive' | 'pending' | 'success' | 'queued' | 'in_progress' | 'waiting';
+  /** Status description */
+  description?: string;
+  /** Target URL for the deployment */
+  target_url?: string;
+  /** User who created the status */
+  creator: {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+  };
+  /** Timestamp when status was created */
+  created_at: string;
+  /** Timestamp when status was updated */
+  updated_at: string;
+}
+
+/**
+ * GitHub environment protection rule
+ */
+export interface GitHubEnvironmentProtectionRule {
+  /** Rule ID */
+  id: number;
+  /** Rule type */
+  type: 'required_reviewers' | 'wait_timer' | 'branch_policy';
+  /** Required reviewers (if type is required_reviewers) */
+  reviewers?: Array<{
+    type: 'User' | 'Team';
+    reviewer: {
+      login: string;
+      id: number;
+      avatar_url?: string;
+      html_url?: string;
+    };
+  }>;
+  /** Wait timer in minutes (if type is wait_timer) */
+  wait_timer?: number;
+}
+
+/**
+ * GitHub environment with protection rules
+ */
+export interface GitHubEnvironmentWithProtection extends GitHubEnvironment {
+  /** Protection rules for the environment */
+  protection_rules: GitHubEnvironmentProtectionRule[];
+  /** Deployment branch policy */
+  deployment_branch_policy?: {
+    protected_branches: boolean;
+    custom_branch_policies: boolean;
+  };
+}
+
+/**
  * GitHub API error response
  */
 export interface GitHubApiError {

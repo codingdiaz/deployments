@@ -6,11 +6,12 @@
  * Possible deployment status values
  */
 export type DeploymentStatusType = 
-  | 'idle'        // No deployment activity
-  | 'running'     // Deployment in progress
-  | 'success'     // Deployment completed successfully
-  | 'failure'     // Deployment failed
-  | 'cancelled';  // Deployment was cancelled
+  | 'idle'                // No deployment activity
+  | 'running'             // Deployment in progress
+  | 'success'             // Deployment completed successfully
+  | 'failure'             // Deployment failed
+  | 'cancelled'           // Deployment was cancelled
+  | 'waiting_approval';   // Deployment is waiting for approval
 
 /**
  * GitHub user information
@@ -48,6 +49,8 @@ export interface DeploymentStatus {
   deployedBy?: GitHubUser;
   /** Error message if deployment failed */
   errorMessage?: string;
+  /** Pending approval information (if status is waiting_approval) */
+  pendingApproval?: PendingApproval;
 }
 
 /**
@@ -96,6 +99,52 @@ export interface DeploymentHistoryResponse {
   page: number;
   /** Number of items per page */
   pageSize: number;
+}
+
+/**
+ * Pending approval information
+ */
+export interface PendingApproval {
+  /** GitHub deployment ID */
+  deploymentId: number;
+  /** Environment name requiring approval */
+  environment: string;
+  /** Version being deployed */
+  version: string;
+  /** User who triggered the deployment */
+  triggeredBy: GitHubUser;
+  /** Timestamp when approval was requested */
+  requestedAt: Date;
+  /** Required reviewers for this environment */
+  requiredReviewers: string[];
+  /** Teams that can approve */
+  requiredTeams: string[];
+  /** Whether the current user can approve this deployment */
+  canApprove: boolean;
+  /** URL to the GitHub deployment */
+  deploymentUrl: string;
+  /** Approval timeout (if configured) */
+  timeoutMinutes?: number;
+}
+
+/**
+ * Request payload for approving a deployment
+ */
+export interface ApproveDeploymentRequest {
+  /** GitHub deployment ID */
+  deploymentId: number;
+  /** Optional comment for the approval */
+  comment?: string;
+}
+
+/**
+ * Response payload for deployment approval
+ */
+export interface ApproveDeploymentResponse {
+  /** Whether the approval was successful */
+  success: boolean;
+  /** Updated deployment status */
+  status: DeploymentStatus;
 }
 
 /**

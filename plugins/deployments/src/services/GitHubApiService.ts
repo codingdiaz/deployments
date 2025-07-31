@@ -901,9 +901,32 @@ export class GitHubApiService {
         workflowRunUrl = latestDeployment.payload.workflow_run_url;
       }
 
+      // Create pending approval if status indicates waiting for approval
+      let pendingApproval: any = undefined;
+      if (finalStatus && (finalStatus.state === 'pending' || finalStatus.state === 'queued')) {
+        pendingApproval = {
+          deploymentId: latestDeployment.id,
+          environment: environmentName,
+          version: this.parseVersionFromDeployment(latestDeployment),
+          triggeredBy: latestDeployment.creator || {
+            login: 'unknown',
+            id: 0,
+            avatar_url: '',
+            html_url: '',
+            type: 'User',
+          },
+          requestedAt: new Date(latestDeployment.created_at),
+          requiredReviewers: [], // This would come from environment protection rules
+          requiredTeams: [], // This would come from environment protection rules  
+          canApprove: true, // Assume user can approve - in real implementation, check permissions
+          deploymentUrl: `https://github.com/${owner}/${repo}/deployments/${latestDeployment.id}`,
+          timeoutMinutes: undefined,
+        };
+      }
+
       const status: DeploymentStatus = {
         environmentName,
-        status: deploymentStatus,
+        status: pendingApproval ? 'waiting_approval' : deploymentStatus,
         currentVersion: this.parseVersionFromDeployment(latestDeployment),
         deployedAt: deploymentStatus === 'success' && finalStatus 
           ? new Date(finalStatus.created_at) 
@@ -926,6 +949,7 @@ export class GitHubApiService {
           }
           return undefined;
         })(),
+        pendingApproval,
       };
 
       this.statusCache.set(cacheKey, { data: status, timestamp: Date.now() });
@@ -1129,6 +1153,102 @@ export class GitHubApiService {
         }
         throw error;
       }
+    });
+  }
+
+  async createDeploymentStatus(
+    owner: string,
+    repo: string,
+    deploymentId: number,
+    state: 'error' | 'failure' | 'inactive' | 'in_progress' | 'queued' | 'pending' | 'success',
+    description?: string,
+    targetUrl?: string,
+  ): Promise<GitHubDeploymentStatus> {
+    const octokit = await this.getOctokit();
+
+    return this.handleApiCall(async () => {
+      const response = await octokit.rest.repos.createDeploymentStatus({
+        owner,
+        repo,
+        deployment_id: deploymentId,
+        state,
+        description,
+        target_url: targetUrl,
+      });
+
+      return {
+        id: response.data.id,
+        state: response.data.state as 'error' | 'failure' | 'inactive' | 'in_progress' | 'queued' | 'pending' | 'success',
+        description: response.data.description,
+        environment: response.data.environment || '',
+        target_url: response.data.target_url,
+        log_url: response.data.log_url || null,
+        created_at: response.data.created_at,
+        updated_at: response.data.updated_at,
+        deployment_url: response.data.deployment_url,
+      };
+    });
+  }
+
+  async approveDeployment(
+    owner: string,
+    repo: string,
+    deploymentId: number,
+    comment?: string,
+  ): Promise<void> {
+    return this.handleApiCall(async () => {
+      await this.createDeploymentStatus(
+        owner,
+        repo,
+        deploymentId,
+        'success',
+        comment || 'Deployment approved via Backstage'
+      );
+    });
+  }
+
+  async rejectDeployment(
+    owner: string,
+    repo: string,
+    deploymentId: number,
+    comment?: string,
+  ): Promise<void> {
+    return this.handleApiCall(async () => {
+      await this.createDeploymentStatus(
+        owner,
+        repo,
+        deploymentId,
+        'failure',
+        comment || 'Deployment rejected via Backstage'
+      );
+    });
+  }
+
+  async getPendingDeployments(
+    owner: string,
+    repo: string,
+    environment?: string,
+  ): Promise<GitHubDeployment[]> {
+    return this.handleApiCall(async () => {
+      const deployments = await this.listDeployments(owner, repo, environment, 50);
+      
+      // Filter for deployments that are in pending state (waiting for approval)
+      const pendingDeployments: GitHubDeployment[] = [];
+      
+      for (const deployment of deployments) {
+        const statuses = await this.listDeploymentStatuses(owner, repo, deployment.id, 10);
+        
+        // Check if the latest status is pending/queued (indicating waiting for approval)
+        const latestStatus = statuses.sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0];
+        
+        if (latestStatus && (latestStatus.state === 'pending' || latestStatus.state === 'queued')) {
+          pendingDeployments.push(deployment);
+        }
+      }
+      
+      return pendingDeployments;
     });
   }
 }
